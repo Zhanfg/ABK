@@ -149,6 +149,15 @@ jobs:
           echo "Found kernel image: $KERNEL_IMAGE"
           cp "$KERNEL_IMAGE" AnyKernel3/
 
+          # Also copy dtbo.img if exists in source tree
+          DTBO_IMG=$(find arch/arm64/boot/dts -name "dtbo.img" 2>/dev/null | head -n 1)
+          if [ -n "$DTBO_IMG" ]; then
+            echo "Found dtbo.img: $DTBO_IMG"
+            cp "$DTBO_IMG" AnyKernel3/
+          else
+            echo "Warning: dtbo.img not found in build tree"
+          fi
+
           echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAo=" | base64 -d > AnyKernel3/anykernel.sh
 
           cd AnyKernel3
