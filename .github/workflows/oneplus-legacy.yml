@@ -154,8 +154,21 @@ jobs:
           if [ -n "$DTBO_IMG" ]; then
             echo "Found dtbo.img: $DTBO_IMG"
             cp "$DTBO_IMG" AnyKernel3/
+          elif [ -f "dtbo.img" ]; then
+            echo "Using local dtbo.img"
+            cp "dtbo.img" AnyKernel3/
           else
-            echo "Warning: dtbo.img not found in build tree"
+            echo "Warning: dtbo.img not found"
+          fi
+
+          # Also copy vbmeta-disable-verification tool from original AK3
+          if [ -f "dtbo.img" ]; then
+            # Download from original AnyKernel3 repo (has this tool)
+            curl -sL "https://raw.githubusercontent.com/osm0sis/AnyKernel3/master/tools/vbmeta-disable-verification" -o AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null
+            chmod +x AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || true
+            if [ -s AnyKernel3/tools/vbmeta-disable-verification ]; then
+              echo "✓ vbmeta-disable-verification 已添加"
+            fi
           fi
 
           echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAo=" | base64 -d > AnyKernel3/anykernel.sh
