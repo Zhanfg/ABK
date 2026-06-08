@@ -136,9 +136,12 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1
           rm -rf AnyKernel3/.git
 
-          # Find kernel image - prefer compressed, then uncompressed
-          KERNEL_IMAGE=$(find out/arch/arm64/boot \
-            -name "Image.gz-dtb" -o -name "Image.gz" -o -name "Image-dtb" -o -name "Image" | head -n 1)
+          # Find kernel image - prefer compressed format (Image.gz-dtb)
+          KERNEL_IMAGE=$(find out/arch/arm64/boot -name "Image.gz-dtb" | head -n 1)
+          if [ -z "$KERNEL_IMAGE" ]; then
+            KERNEL_IMAGE=$(find out/arch/arm64/boot \
+              -name "Image.gz" -o -name "Image-dtb" -o -name "Image" | head -n 1)
+          fi
           if [ -z "$KERNEL_IMAGE" ]; then
             echo "::error::未找到内核镜像"
             exit 1
