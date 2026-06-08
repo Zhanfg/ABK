@@ -129,17 +129,26 @@ jobs:
           DTBO_DIR=out/arch/arm64/boot/dts/qcom
           # Build ALL DTBO overlays (OnePlus 6/6T require this)
           echo "--- 强制编译所有 DTBO 覆盖层 ---"
-          # Force compile specific dtbo overlays
+          # Force compile specific dtbo overlays using dtc directly
           for dtbo in enchilada-evb-v2.1-overlay enchilada-t0-v2.1-overlay \
                       enchilada-evt1-v2.1-overlay enchilada-evt2-v2.1-overlay \
                       enchilada-evt2-cxo-v2.1-overlay enchilada-dvt-v2.1-overlay \
                       enchilada-dvt-v2.1-backup-overlay enchilada-dvt-v2.1-usb30-overlay \
                       enchilada-pvt-v2.1-overlay enchilada-pvt-v2.1-backup-overlay \
-                      enchilada-mp-v2.1-overlay; do
-            if [ ! -f "$DTBO_DIR/${dtbo}.dtbo" ]; then
-              make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-                CLANG_TRIPLE=aarch64-linux-gnu- \
-                "$DTBO_DIR/${dtbo}.dtbo" 2>/dev/null || true
+                      enchilada-mp-v2.1-overlay \
+                      fajita-pvt-v2.1-overlay fajita-pvt-v2.1-bu-overlay \
+                      fajita-pvt-v2.1-v1-overlay fajita-pvt-v2.1-spec-overlay \
+                      fajita-mp-v2.1-spec-overlay; do
+            src="arch/arm64/boot/dts/qcom/${dtbo}.dts"
+            out="$DTBO_DIR/${dtbo}.dtbo"
+            if [ -f "$src" ] && [ ! -f "$out" ]; then
+              echo "  编译: $dtbo"
+              ${CROSS_COMPILE:-}cpp -nostdinc -undef \
+                -I arch/arm64/boot/dts/qcom \
+                -I include \
+                -I kernel/include \
+                -include "include/generated/autoconf.h" \
+                "$src" 2>/dev/null | dtc -@ -I dts -O dtb -o "$out" - || true
             fi
           done
           echo "--- 实际 DTBO 列表 ---"
