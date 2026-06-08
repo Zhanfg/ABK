@@ -1,0 +1,133 @@
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1895,11 +1895,19 @@
+ 	return retval;
+ }
+ 
++#if IS_ENABLED(CONFIG_KSU)
++extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
++			      void *envp, int *flags);
++#endif
++
+ static int do_execveat_common(int fd, struct filename *filename,
+ 			      struct user_arg_ptr argv,
+ 			      struct user_arg_ptr envp,
+ 			      int flags)
+ {
++#if IS_ENABLED(CONFIG_KSU)
++	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
+ 	return __do_execve_file(fd, filename, argv, envp, flags, NULL);
+ }
+ 
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -353,6 +353,11 @@
+  * We do this by temporarily clearing all FS-related capabilities and
+  * switching the fsuid/fsgid around to the real ones.
+  */
++#if IS_ENABLED(CONFIG_KSU)
++extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
++			      int *flags);
++#endif
++
+ long do_faccessat(int dfd, const char __user *filename, int mode)
+ {
+ 	const struct cred *old_cred;
+@@ -362,6 +367,9 @@
+ 	struct vfsmount *mnt;
+ 	int res;
+ 	unsigned int lookup_flags = LOOKUP_FOLLOW;
++#if IS_ENABLED(CONFIG_KSU)
++	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
++#endif
+ 
+ 	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
+ 		return -EINVAL;
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -163,12 +163,19 @@
+  *
+  * 0 will be returned on success, and a -ve error code if unsuccessful.
+  */
++#if IS_ENABLED(CONFIG_KSU)
++extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
++#endif
++
+ int vfs_statx(int dfd, const char __user *filename, int flags,
+ 	      struct kstat *stat, u32 request_mask)
+ {
+ 	struct path path;
+ 	int error = -EINVAL;
+ 	unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;
++#if IS_ENABLED(CONFIG_KSU)
++	ksu_handle_stat(&dfd, &filename, &flags);
++#endif
+ 
+ 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
+ 		       AT_EMPTY_PATH | KSTAT_QUERY_FLAGS)) != 0)
+@@ -374,6 +381,10 @@
+ 
+ 	if (!error)
+ 		error = cp_new_stat(&stat, statbuf);
++#if IS_ENABLED(CONFIG_KSU)
++extern void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf_ptr);
++	if (!error) ksu_handle_newfstat_ret(&fd, &statbuf);
++#endif
+ 
+ 	return error;
+ }
+@@ -500,6 +511,10 @@
+ 
+ 	if (!error)
+ 		error = cp_new_stat64(&stat, statbuf);
++#if IS_ENABLED(CONFIG_KSU)
++extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_ptr);
++	if (!error) ksu_handle_fstat64_ret(&fd, &statbuf);
++#endif
+ 
+ 	return error;
+ }
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -305,6 +305,10 @@
+  *
+  * reboot doesn't sync: do that yourself before calling this.
+  */
++#ifdef CONFIG_KSU
++extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
++#endif
++
+ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 		void __user *, arg)
+ {
+@@ -313,6 +317,9 @@
+ 	int ret = 0;
+ 
+ 	/* We only trust the superuser with rebooting the system. */
++#ifdef CONFIG_KSU
++	ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++#endif
+ 	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
+ 		return -EPERM;
+ 
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -378,10 +378,17 @@
+ 	return disposition;
+ }
+ 
++#if IS_ENABLED(CONFIG_KSU)
++extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
++#endif
++
+ static void input_handle_event(struct input_dev *dev,
+ 			       unsigned int type, unsigned int code, int value)
+ {
+ 	int disposition = input_get_disposition(dev, type, code, &value);
++#if IS_ENABLED(CONFIG_KSU)
++	ksu_handle_input_handle_event(&type, &code, &value);
++#endif
+ 
+ 	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
+ 		add_input_randomness(type, code, value);
