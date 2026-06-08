@@ -172,15 +172,18 @@ jobs:
           # Also copy dtbo.img from ABK repo root
           echo "--- 查找 dtbo.img ---"
           echo "PWD: $(pwd)"
-          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-not set}"
+          ls -la dtbo.img 2>&1 || echo "当前目录无 dtbo.img"
           ls -la ../../dtbo.img 2>&1 || echo "ABK 根目录无 dtbo.img"
-          ls -la ../dtbo.img 2>&1 || echo "kernel/ 目录无 dtbo.img"
+          ls -la ../dtbo.img 2>&1 || echo "上级目录无 dtbo.img"
 
-          if [ -f "../../dtbo.img" ]; then
+          if [ -f "dtbo.img" ]; then
+            echo "✓ 从当前目录 (kernel/) 复制 dtbo.img"
+            cp dtbo.img AnyKernel3/
+          elif [ -f "../../dtbo.img" ]; then
             echo "✓ 从 ABK 根目录复制 dtbo.img"
             cp ../../dtbo.img AnyKernel3/
           elif [ -f "../dtbo.img" ]; then
-            echo "✓ 从 kernel/ 目录复制 dtbo.img"
+            echo "✓ 从上级目录复制 dtbo.img"
             cp ../dtbo.img AnyKernel3/
           else
             echo "::error::dtbo.img 未找到！设备需要此文件"
