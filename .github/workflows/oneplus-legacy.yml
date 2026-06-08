@@ -207,37 +207,10 @@ jobs:
           cp ../susfs4ksu/kernel_patches/include/linux/susfs_def.h  ./include/linux/
           cp ../susfs4ksu/kernel_patches/include/linux/sus_su.h     ./include/linux/
 
-          echo "--- 生成 SuSFS 内核补丁 ---"
-          # 暂存当前状态，生成 diff 作为补丁
-          git add fs/susfs.c fs/sus_su.c include/linux/susfs.h \
-                  include/linux/susfs_def.h include/linux/sus_su.h
-          git diff --cached > /tmp/susfs_files.patch
-          git reset
-
-          echo "--- 应用 SuSFS 内核补丁 (文件复制已完成) ---"
-          # 如果有现成补丁则尝试应用；否则文件已手动复制，跳过
-          for patch in \
-            ../susfs4ksu/kernel_patches/4.19/0001-susfs-in-kernel.patch \
-            ../susfs4ksu/kernel_patches/4.19/susfs-kernel.patch \
-            ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch; do
-            if [ -f "$patch" ]; then
-              echo "应用补丁: $patch"
-              patch -p1 < "$patch" || echo "::warning::补丁 $patch 部分失败"
-              break
-            fi
-          done
-
-          echo "--- 应用 SuSFS KernelSU 补丁 ---"
-          # 尝试多种可能的补丁路径
-          for patch in \
-            ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch \
-            ../susfs4ksu/kernel_patches/4.19/0002-susfs-ksu.patch; do
-            if [ -f "$patch" ]; then
-              echo "应用补丁: $patch"
-              patch -p1 < "$patch" 2>/dev/null || echo "::warning::KSU 补丁 $patch 失败"
-              break
-            fi
-          done
+          echo "--- SuSFS 源文件已复制，跳过不兼容补丁 ---"
+          # susfs4ksu kernel-4.19 的补丁为 4.14 编写，与 4.19 不兼容
+          # 源文件 (susfs.c/susfs.h 等) 已手动复制到内核树
+          # ReSukiSU 已完成 KernelSU 集成，无需额外 KSU 补丁
 
           echo "--- 写入 SuSFS Kconfig ---"
           cat >> arch/arm64/$DEFCONFIG <<'CONF'
