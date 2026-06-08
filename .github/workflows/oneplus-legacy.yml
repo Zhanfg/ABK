@@ -140,9 +140,9 @@ jobs:
           # Priority: 1) ABK root dtbo.img (pre-built 8.4MB) 2) rebuilt from source
           echo "--- 准备 dtbo.img ---"
           DTBO_DIR=out/arch/arm64/boot/dts/qcom
-          if [ -f "../../dtbo.img" ]; then
+          if [ -f "../dtbo.img" ]; then
             echo "✓ 使用 ABK 根目录的完整 dtbo.img (8.4MB, 16 overlays)"
-            cp ../../dtbo.img ./dtbo.img
+            cp ../dtbo.img ./dtbo.img
           else
             echo "--- 从源码重建 dtbo.img ---"
             DTBO_FILES=$(find "$DTBO_DIR" \( -name "enchilada*.dtbo" -o -name "fajita*.dtbo" -o -name "sdm845*overlay.dtbo" \) 2>/dev/null | sort)
