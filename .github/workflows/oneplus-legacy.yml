@@ -194,11 +194,22 @@ jobs:
             sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
           echo "--- 应用 KSU Hook 补丁 (4.19 手动集成) ---"
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE/patches/" || echo "patches/ 目录不存在"
+          ls -la "$GITHUB_WORKSPACE/" | head -20
 
           # 应用预生成的补丁文件，注入所有必需的 KSU hook
           # 补丁包含: fs/exec.c, fs/open.c, fs/stat.c, kernel/reboot.c, drivers/input/input.c
-          patch -p1 < "$GITHUB_WORKSPACE/patches/ksu_hooks_4.19.patch"
-          echo "  ✓ KSU hooks 补丁应用成功"
+          PATCH_FILE="$GITHUB_WORKSPACE/patches/ksu_hooks_4.19.patch"
+          if [ -f "$PATCH_FILE" ]; then
+            patch -p1 < "$PATCH_FILE"
+            echo "  ✓ KSU hooks 补丁应用成功"
+          else
+            echo "::error::补丁文件不存在: $PATCH_FILE"
+            echo "尝试查找补丁文件..."
+            find "$GITHUB_WORKSPACE" -name "*.patch" -type f 2>/dev/null | head -10
+            exit 1
+          fi
 
           echo "--- 写入 ReSukiSU 内核配置 ---"
           DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
