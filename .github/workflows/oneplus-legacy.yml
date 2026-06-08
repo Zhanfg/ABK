@@ -106,6 +106,16 @@ jobs:
             echo "::error::未找到内核镜像产物"
             exit 1
           }
+
+          # Create Image.gz-dtb (compressed kernel + DTB)
+          echo "--- 压缩内核 + 拼接 DTB ---"
+          cd out/arch/arm64/boot
+          gzip -f9 Image
+          cat Image.gz Image-dtb-hdr sdm845-v2.1.dtb sdm845.dtb sdm845-v2.dtb > Image.gz-dtb
+          ls -lh Image.gz-dtb
+          echo "--- 压缩完成 ---"
+          cd ../../../..
+
           ccache -s
 
       - name: 打包 AnyKernel3
