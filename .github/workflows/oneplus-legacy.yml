@@ -196,101 +196,54 @@ jobs:
           echo "--- 注入 KSU 内核 Hook (4.19 手动集成) ---"
 
           # 1. fs/exec.c - ksu_handle_execveat
+          # shinichi-c: do_execveat_common 直接调用 __do_execve_file
           if ! grep -q "ksu_handle_execveat" fs/exec.c; then
-            sed -i '/^static int do_execveat_common/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,\
-                      void *envp, int *flags);\
-          #endif' fs/exec.c
-            sed -i '/return __do_execve_file/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tif (unlikely(1))\
-          \t\tksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);\
-          #endif' fs/exec.c
+            # extern 声明放在函数定义之前
+            sed -i '/^static int do_execveat_common/i\#if IS_ENABLED(CONFIG_KSU)\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);\n#endif\n' fs/exec.c
+            # hook 调用放在 return __do_execve_file 之前
+            sed -i '/return __do_execve_file/i\#if IS_ENABLED(CONFIG_KSU)\n\tksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);\n#endif\n' fs/exec.c
             echo "  ✓ fs/exec.c: ksu_handle_execveat"
           fi
 
           # 2. fs/open.c - ksu_handle_faccessat
+          # shinichi-c: do_faccessat 在 line 356, lookup_flags 在函数体中
           if ! grep -q "ksu_handle_faccessat" fs/open.c; then
-            sed -i '/^int do_faccessat/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,\
-                               int *flags);\
-          #endif' fs/open.c
-            sed -i '/unsigned int lookup_flags = LOOKUP_FOLLOW;/a\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\
-          #endif' fs/open.c
+            # extern 声明放在文件开头 (include 之后)
+            sed -i '/^#include.*<linux/i\#if IS_ENABLED(CONFIG_KSU)\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);\n#endif\n' fs/open.c
+            # hook 调用放在 do_faccessat 的 lookup_flags 赋值之后
+            sed -i '/unsigned int lookup_flags = LOOKUP_FOLLOW;/a\\n#if IS_ENABLED(CONFIG_KSU)\n\tksu_handle_faccessat(&dfd, &filename, &mode, NULL);\n#endif' fs/open.c
             echo "  ✓ fs/open.c: ksu_handle_faccessat"
           fi
 
           # 3. fs/stat.c - ksu_handle_stat + ksu_handle_newfstat_ret + ksu_handle_fstat64_ret
           if ! grep -q "ksu_handle_stat" fs/stat.c; then
-            # ksu_handle_stat
-            sed -i '/^ssize_t vfs_statx/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\
-          #endif' fs/stat.c
-            sed -i '/unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;/a\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tksu_handle_stat(&dfd, &filename, &flags);\
-          #endif' fs/stat.c
-            echo "  ✓ fs/stat.c: ksu_handle_stat"
-          fi
-
-          # ksu_handle_newfstat_ret (在 SYSCALL_DEFINE2(newfstat, ...) 的 return error 之前)
-          if ! grep -q "ksu_handle_newfstat_ret" fs/stat.c; then
-            sed -i '/SYSCALL_DEFINE2(newfstat,/a\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf_ptr);\
-          #endif' fs/stat.c
-            # 在 newfstat 的 "return error" 前注入
-            sed -i '/SYSCALL_DEFINE2(newfstat/,/return error/{/return error/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tif (!error) ksu_handle_newfstat_ret(&fd, &statbuf);\
-          #endif
-          }' fs/stat.c
-            echo "  ✓ fs/stat.c: ksu_handle_newfstat_ret"
-          fi
-
-          # ksu_handle_fstat64_ret
-          if ! grep -q "ksu_handle_fstat64_ret" fs/stat.c; then
-            sed -i '/SYSCALL_DEFINE2(fstat64,/a\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_ptr);\
-          #endif' fs/stat.c
-            sed -i '/SYSCALL_DEFINE2(fstat64/,/return error/{/return error/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tif (!error) ksu_handle_fstat64_ret(&fd, &statbuf);\
-          #endif
-          }' fs/stat.c
-            echo "  ✓ fs/stat.c: ksu_handle_fstat64_ret"
+            # extern 声明
+            sed -i '/^#include.*<linux/i\#if IS_ENABLED(CONFIG_KSU)\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);\nextern void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf_ptr);\nextern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_ptr);\n#endif\n' fs/stat.c
+            # ksu_handle_stat 在 vfs_statx 中
+            sed -i '/unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;/a\\n#if IS_ENABLED(CONFIG_KSU)\n\tksu_handle_stat(&dfd, &filename, &flags);\n#endif' fs/stat.c
+            # ksu_handle_newfstat_ret 在 SYSCALL_DEFINE2(newfstat,...) 的 return 前
+            # shinichi-c: SYSCALL_DEFINE2(newfstat, 在 line 370
+            sed -i '/SYSCALL_DEFINE2(newfstat/,/return error/{s/return error/#if IS_ENABLED(CONFIG_KSU)\n\tif (!error) ksu_handle_newfstat_ret(&fd, &statbuf);\n#endif\nreturn error/}' fs/stat.c
+            # ksu_handle_fstat64_ret 在 SYSCALL_DEFINE2(fstat64,...) 的 return 前
+            # shinichi-c: SYSCALL_DEFINE2(fstat64, 在 line 496
+            sed -i '/SYSCALL_DEFINE2(fstat64/,/return error/{s/return error/#if IS_ENABLED(CONFIG_KSU)\n\tif (!error) ksu_handle_fstat64_ret(&fd, &statbuf);\n#endif\nreturn error/}' fs/stat.c
+            echo "  ✓ fs/stat.c: ksu_handle_stat + newfstat_ret + fstat64_ret"
           fi
 
           # 4. kernel/reboot.c - ksu_handle_sys_reboot
+          # shinichi-c: SYSCALL_DEFINE4(reboot,...) 在 line 308
           if ! grep -q "ksu_handle_sys_reboot" kernel/reboot.c; then
-            sed -i '/SYSCALL_DEFINE4(reboot,/i\
-          #ifdef CONFIG_KSU\
-          extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);\
-          #endif' kernel/reboot.c
-            sed -i '/SYSCALL_DEFINE4(reboot/,/if (!ns_capable/{/if (!ns_capable/i\
-          #ifdef CONFIG_KSU\
-          \tksu_handle_sys_reboot(magic1, magic2, cmd, &arg);\
-          #endif
-          }' kernel/reboot.c
+            # extern 声明放在 SYSCALL_DEFINE4(reboot) 之前
+            sed -i '/^SYSCALL_DEFINE4(reboot,/i\#ifdef CONFIG_KSU\nextern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);\n#endif\n' kernel/reboot.c
+            # hook 调用放在 if (!ns_capable) 之前
+            sed -i '/if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))/i\#ifdef CONFIG_KSU\n\tksu_handle_sys_reboot(magic1, magic2, cmd, &arg);\n#endif\n' kernel/reboot.c
             echo "  ✓ kernel/reboot.c: ksu_handle_sys_reboot"
           fi
 
           # 5. drivers/input/input.c - ksu_handle_input_handle_event
           if ! grep -q "ksu_handle_input_handle_event" drivers/input/input.c; then
-            sed -i '/^static void input_handle_event/i\
-          #if IS_ENABLED(CONFIG_KSU)\
-          extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\
-          #endif' drivers/input/input.c
-            sed -i '/int disposition = input_get_disposition/a\
-          #if IS_ENABLED(CONFIG_KSU)\
-          \tksu_handle_input_handle_event(&type, &code, &value);\
-          #endif' drivers/input/input.c
+            sed -i '/^static void input_handle_event/i\#if IS_ENABLED(CONFIG_KSU)\nextern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);\n#endif\n' drivers/input/input.c
+            sed -i '/int disposition = input_get_disposition/a\\n#if IS_ENABLED(CONFIG_KSU)\n\tksu_handle_input_handle_event(&type, &code, &value);\n#endif' drivers/input/input.c
             echo "  ✓ drivers/input/input.c: ksu_handle_input_handle_event"
           fi
 
