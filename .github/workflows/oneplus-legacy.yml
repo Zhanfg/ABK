@@ -72,7 +72,7 @@ jobs:
           export KBUILD_BUILD_USER="abk"
           export KBUILD_BUILD_HOST="abk"
           export KBUILD_BUILD_VERSION=1
-          export KBUILD_BUILD_TIMESTAMP="$(date -u '+%Y%m%d%H%M%S')"
+          export KBUILD_BUILD_TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S')"
 
           make O=out \
             ARCH=arm64 \
