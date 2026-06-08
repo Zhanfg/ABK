@@ -193,59 +193,8 @@ jobs:
         if: ${{ inputs.enable_susfs == true }}
         shell: bash
         run: |
-          set -euo pipefail
-          cd kernel
-
-          echo "--- 克隆 susfs4ksu (kernel-4.19) ---"
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git \
-            -b kernel-4.19 --depth=1 ../susfs4ksu
-
-          echo "--- 复制 SuSFS 内核源文件 ---"
-          cp ../susfs4ksu/kernel_patches/fs/susfs.c           ./fs/
-          cp ../susfs4ksu/kernel_patches/fs/sus_su.c          ./fs/
-          cp ../susfs4ksu/kernel_patches/include/linux/susfs.h      ./include/linux/
-          cp ../susfs4ksu/kernel_patches/include/linux/susfs_def.h  ./include/linux/
-          cp ../susfs4ksu/kernel_patches/include/linux/sus_su.h     ./include/linux/
-
-          echo "--- 注册 SuSFS 到内核构建系统 ---"
-          if ! grep -q "susfs" fs/Makefile; then
-            echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
-          fi
-          if ! grep -q "sus_su" fs/Makefile; then
-            echo "obj-\$(CONFIG_KSU_SUSFS_SUS_SU) += sus_su.o" >> fs/Makefile
-          fi
-
-          echo "--- 写入 SuSFS Kconfig ---"
-          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
-          cat >> "$DEFCONFIG_FILE" <<'CONF'
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_SU=n
-          CONF
-
-          # 禁用 Inline Hook 检查（susfs4ksu 4.19 补丁不完整）
-          # ReSukiSU 的 inline_hook_check.mk 会在编译时检查 hook 是否存在
-          # 由于 4.19 内核未被 susfs4ksu 补丁修改，hook 不存在
-          # 通过设置此变量跳过检查
-          if [ -f KernelSU/kernel/tools/inline_hook_check.mk ]; then
-            sed -i 's/^.*ksu_handle_setresuid.*$/\# bypass: hook not injected for 4.19/' \
-              KernelSU/kernel/tools/inline_hook_check.mk || true
-          fi
-
-          echo "--- SuSFS 集成完成 ---"
+          echo "::warning::SuSFS 暂不支持 4.19 内核 (susfs4ksu 补丁不完整)。跳过 SuSFS 集成。"
+          echo "SUSFS_SKIPPED=true" >> "$GITHUB_ENV"
 
       # ── 额外补丁 ──────────────────────────────────────────────────────────
 
