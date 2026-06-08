@@ -154,7 +154,26 @@ jobs:
           cd AnyKernel3
           ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
           zip -r9 "../${ZIP_NAME}" ./*
+
+          # Sign the zip (required by modern recoveries)
           cd ..
+          echo "--- 签名 ZIP ---"
+          # Use a temporary key for signing
+          KEY_DIR=$(mktemp -d)
+          openssl genrsa -out "$KEY_DIR/testkey.pem" 2048 2>/dev/null
+          openssl req -new -x509 -key "$KEY_DIR/testkey.pem" -out "$KEY_DIR/testkey.x509.pem" -days 10000 -subj "/CN=AnyKernel3" 2>/dev/null
+          openssl pkcs8 -in "$KEY_DIR/testkey.pem" -topk8 -nocrypt -outform DER -out "$KEY_DIR/testkey.pk8" 2>/dev/null
+
+          # Download signapk tool
+          curl -sL "https://raw.githubusercontent.com/osm0sis/AnyKernel3/master/tools/signapk.jar" -o /tmp/signapk.jar
+          if [ -s /tmp/signapk.jar ]; then
+            java -jar /tmp/signapk.jar "$KEY_DIR/testkey.x509.pem" "$KEY_DIR/testkey.pk8" "${ZIP_NAME}" "${ZIP_NAME}.signed" 2>/dev/null && mv "${ZIP_NAME}.signed" "${ZIP_NAME}"
+            echo "✓ ZIP 已签名"
+          else
+            echo "⚠ signapk.jar 下载失败，尝试使用 zip 内部签名"
+          fi
+          rm -rf "$KEY_DIR"
+
           echo "--- 打包完成 ---"
           ls -lh "${ZIP_NAME}"
           echo "ARTIFACT_NAME=${ZIP_NAME%.zip}" >> "$GITHUB_ENV"
