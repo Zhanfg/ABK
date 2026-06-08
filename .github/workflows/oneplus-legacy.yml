@@ -154,15 +154,15 @@ jobs:
           if [ -n "$DTBO_IMG" ]; then
             echo "Found dtbo.img: $DTBO_IMG"
             cp "$DTBO_IMG" AnyKernel3/
-          elif [ -f "dtbo.img" ]; then
-            echo "Using local dtbo.img"
-            cp "dtbo.img" AnyKernel3/
+          elif [ -f "../dtbo.img" ]; then
+            echo "Using local dtbo.img from ABK root"
+            cp "../dtbo.img" AnyKernel3/
           else
             echo "Warning: dtbo.img not found"
           fi
 
           # Also copy vbmeta-disable-verification tool from original AK3
-          if [ -f "dtbo.img" ]; then
+          if [ -f "AnyKernel3/dtbo.img" ] || [ -f "../dtbo.img" ]; then
             # Download from original AnyKernel3 repo (has this tool)
             curl -sL "https://raw.githubusercontent.com/osm0sis/AnyKernel3/master/tools/vbmeta-disable-verification" -o AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null
             chmod +x AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || true
