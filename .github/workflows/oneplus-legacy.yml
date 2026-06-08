@@ -107,15 +107,24 @@ jobs:
             exit 1
           }
 
-          # Create Image.gz-dtb (compressed kernel + DTB)
-          echo "--- 压缩内核 + 拼接 DTB ---"
-          cd out/arch/arm64/boot
-          gzip -f9 Image
-          cat Image.gz Image-dtb-hdr sdm845-v2.1.dtb sdm845.dtb sdm845-v2.dtb > Image.gz-dtb
-          ls -lh Image.gz-dtb
-          echo "--- 压缩完成 ---"
-          cd ../../../..
+          # Build compressed Image.gz-dtb
+          echo "--- 构建 Image.gz-dtb ---"
+          make -j"$(nproc --all)" O=out \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CC="ccache clang" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            LLVM=1 \
+            Image.gz-dtb
 
+          ls -lh out/arch/arm64/boot/Image.gz-dtb
+          echo "--- 压缩完成 ---"
           ccache -s
 
       - name: 打包 AnyKernel3
