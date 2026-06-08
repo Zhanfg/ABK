@@ -137,7 +137,7 @@ jobs:
             # OnePlus 6 (enchilada) mp variant is the production version
             cat $DTBO_FILES > "$DTBO_DIR/dtbo.img"
             echo "✓ dtbo.img 已从源码重建 ($(du -h "$DTBO_DIR/dtbo.img" | cut -f1))"
-            cp "$DTBO_DIR/dtbo.img" AnyKernel3/
+            cp "$DTBO_DIR/dtbo.img" ./dtbo.img
           else
             echo "::warning::未找到 enchilada DTBO 文件，使用预置 dtbo.img"
             if [ -f "../../dtbo.img" ]; then
