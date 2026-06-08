@@ -1,0 +1,435 @@
+name: OnePlus Legacy 内核构建 (4.19 非GKI)
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_source:
+        description: "内核源码仓库 URL"
+        required: false
+        type: string
+        default: "https://github.com/shinichi-c/android_kernel_oneplus_sdm845"
+      kernel_branch:
+        description: "内核分支"
+        required: false
+        type: string
+        default: "lineage-23.0-4.19"
+      device_name:
+        description: "设备 (enchilada / fajita / dumpling)"
+        required: true
+        type: choice
+        options:
+          - enchilada
+          - fajita
+          - dumpling
+      defconfig:
+        description: "Defconfig (相对于 arch/arm64/configs/)"
+        required: false
+        type: string
+        default: "vendor/enchilada_defconfig"
+      enable_susfs:
+        description: "启用 SuSFS"
+        required: false
+        type: boolean
+        default: true
+      use_zram:
+        description: "ZRAM LZ4KD 优化"
+        required: false
+        type: boolean
+        default: false
+      use_bbg:
+        description: "Baseband Guard"
+        required: false
+        type: boolean
+        default: false
+      use_custom_external_modules:
+        description: "启用自定义外部模块"
+        required: false
+        type: boolean
+        default: false
+      custom_external_modules:
+        description: "外部模块清单 (URL;阶段|URL;阶段)"
+        required: false
+        type: string
+        default: ""
+      version:
+        description: "自定义版本标签 (留空自动生成)"
+        required: false
+        type: string
+        default: ""
+      build_time:
+        description: "自定义构建时间 (留空自动生成)"
+        required: false
+        type: string
+        default: ""
+
+env:
+  KERNEL_SOURCE: ${{ inputs.kernel_source }}
+  KERNEL_BRANCH: ${{ inputs.kernel_branch }}
+  DEVICE_NAME: ${{ inputs.device_name }}
+  DEFCONFIG: ${{ inputs.defconfig }}
+  ENABLE_SUSFS: ${{ inputs.enable_susfs }}
+  USE_ZRAM: ${{ inputs.use_zram }}
+  USE_BBG: ${{ inputs.use_bbg }}
+  USE_CUSTOM_EXTERNAL_MODULES: ${{ inputs.use_custom_external_modules }}
+  CUSTOM_EXTERNAL_MODULES: ${{ inputs.custom_external_modules }}
+  CUSTOM_VERSION: ${{ inputs.version }}
+  CUSTOM_BUILD_TIME: ${{ inputs.build_time }}
+
+jobs:
+  build:
+    name: "legacy-${{ inputs.device_name }}-4.19"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      # ── 环境准备 ──────────────────────────────────────────────────────────
+
+      - name: 检出 ABK 仓库
+        uses: actions/checkout@v4
+
+      - name: 最大化构建空间
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 4096
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+
+      - name: 安装构建依赖
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            git build-essential bc flex bison libssl-dev \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            clang lld llvm python3 zip unzip cpio \
+            device-tree-compiler libncurses-dev
+
+      - name: 设置 ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: 2G
+          key: legacy-${{ inputs.device_name }}-4.19
+
+      - name: 构建信息摘要
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$CUSTOM_VERSION" ]; then
+            VERSION_LABEL="$CUSTOM_VERSION"
+          else
+            VERSION_LABEL="ABK-legacy-${DEVICE_NAME}-$(date -u '+%Y%m%d-%H%M')"
+          fi
+          if [ -n "$CUSTOM_BUILD_TIME" ]; then
+            BUILD_TIME="$CUSTOM_BUILD_TIME"
+          else
+            BUILD_TIME="$(date -u '+%Y%m%d%H%M%S')"
+          fi
+
+          case "$DEVICE_NAME" in
+            enchilada) DEVICE_DISPLAY="OnePlus 6" ;;
+            fajita)    DEVICE_DISPLAY="OnePlus 6T" ;;
+            dumpling)  DEVICE_DISPLAY="OnePlus 6T (CN)" ;;
+            *)         DEVICE_DISPLAY="$DEVICE_NAME" ;;
+          esac
+
+          echo "VERSION_LABEL=$VERSION_LABEL" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+          echo "DEVICE_DISPLAY=$DEVICE_DISPLAY" >> "$GITHUB_ENV"
+
+          echo "========================================"
+          echo "    ABK Legacy 内核构建配置"
+          echo "========================================"
+          echo "构建目标      : OnePlus Legacy (非GKI)"
+          echo "设备          : ${DEVICE_DISPLAY} (${DEVICE_NAME})"
+          echo "内核源码      : ${KERNEL_SOURCE}"
+          echo "内核分支      : ${KERNEL_BRANCH}"
+          echo "Defconfig     : ${DEFCONFIG}"
+          echo "内核版本      : 4.19"
+          echo "Root 方案     : ReSukiSU (non-GKI)"
+          echo "SuSFS         : ${ENABLE_SUSFS}"
+          echo "ZRAM LZ4KD    : ${USE_ZRAM}"
+          echo "BBG           : ${USE_BBG}"
+          echo "版本标签      : ${VERSION_LABEL}"
+          echo "========================================"
+
+      # ── 拉取内核源码 ──────────────────────────────────────────────────────
+
+      - name: 克隆内核源码
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" kernel
+          cd kernel
+          sed -i 's/ -dirty//g' scripts/setlocalversion
+          sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' scripts/setlocalversion
+          git add -A && git commit -m "Remove -dirty suffix"
+
+      # ── 集成 ReSukiSU ────────────────────────────────────────────────────
+
+      - name: 集成 ReSukiSU
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          echo "--- ReSukiSU 目录结构 ---"
+          ls KernelSU/ 2>/dev/null || echo "(无 KernelSU 目录)"
+          ls drivers/ | grep -iE "ksu|resukisu" || echo "(无 KSU 驱动目录)"
+
+      # ── 集成 SuSFS ───────────────────────────────────────────────────────
+
+      - name: 集成 SuSFS
+        if: ${{ inputs.enable_susfs == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel
+
+          echo "--- 克隆 susfs4ksu (kernel-4.19) ---"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git \
+            -b kernel-4.19 --depth=1 ../susfs4ksu
+
+          echo "--- 复制 SuSFS 内核源文件 ---"
+          cp ../susfs4ksu/kernel_patches/fs/susfs.c           ./fs/
+          cp ../susfs4ksu/kernel_patches/fs/sus_su.c          ./fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/susfs.h      ./include/linux/
+          cp ../susfs4ksu/kernel_patches/include/linux/susfs_def.h  ./include/linux/
+          cp ../susfs4ksu/kernel_patches/include/linux/sus_su.h     ./include/linux/
+
+          echo "--- 生成 SuSFS 内核补丁 ---"
+          # 暂存当前状态，生成 diff 作为补丁
+          git add fs/susfs.c fs/sus_su.c include/linux/susfs.h \
+                  include/linux/susfs_def.h include/linux/sus_su.h
+          git diff --cached > /tmp/susfs_files.patch
+          git reset
+
+          echo "--- 应用 SuSFS 内核补丁 (文件复制已完成) ---"
+          # 如果有现成补丁则尝试应用；否则文件已手动复制，跳过
+          for patch in \
+            ../susfs4ksu/kernel_patches/4.19/0001-susfs-in-kernel.patch \
+            ../susfs4ksu/kernel_patches/4.19/susfs-kernel.patch \
+            ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch; do
+            if [ -f "$patch" ]; then
+              echo "应用补丁: $patch"
+              patch -p1 < "$patch" || echo "::warning::补丁 $patch 部分失败"
+              break
+            fi
+          done
+
+          echo "--- 应用 SuSFS KernelSU 补丁 ---"
+          # 尝试多种可能的补丁路径
+          for patch in \
+            ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch \
+            ../susfs4ksu/kernel_patches/4.19/0002-susfs-ksu.patch; do
+            if [ -f "$patch" ]; then
+              echo "应用补丁: $patch"
+              patch -p1 < "$patch" 2>/dev/null || echo "::warning::KSU 补丁 $patch 失败"
+              break
+            fi
+          done
+
+          echo "--- 写入 SuSFS Kconfig ---"
+          cat >> arch/arm64/$DEFCONFIG <<'CONF'
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_SU=n
+          CONF
+
+          echo "--- SuSFS 集成完成 ---"
+
+      # ── 额外补丁 ──────────────────────────────────────────────────────────
+
+      - name: ZRAM LZ4KD 优化
+        if: ${{ inputs.use_zram == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel
+          cat >> arch/arm64/$DEFCONFIG <<'CONF'
+          CONFIG_ZSMALLOC=y
+          CONFIG_ZRAM=y
+          CONFIG_MODULE_SIG=n
+          CONFIG_CRYPTO_LZ4KD=y
+          CONFIG_ZRAM_DEF_COMP_LZ4KD=y
+          CONF
+          echo "--- ZRAM LZ4KD 配置已追加 ---"
+
+      - name: Baseband Guard
+        if: ${{ inputs.use_bbg == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel
+          curl -fsSL https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash || {
+            echo "::warning::BBG 补丁应用失败，跳过"
+          }
+
+      - name: 自定义外部模块
+        if: ${{ inputs.use_custom_external_modules == true && inputs.custom_external_modules != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KERNEL_ROOT="$GITHUB_WORKSPACE/kernel"
+          export DEFCONFIG_PATH="$KERNEL_ROOT/arch/arm64/$DEFCONFIG"
+          export ZZH_PATCHES="$GITHUB_WORKSPACE"
+
+          IFS='|' read -ra MODULES <<< "$CUSTOM_EXTERNAL_MODULES"
+          for module_spec in "${MODULES[@]}"; do
+            IFS=';' read -r module_url stage <<< "$module_spec"
+            module_name=$(basename "$module_url" .git)
+            echo "--- 外部模块: $module_name (阶段: $stage) ---"
+            git clone --depth=1 "$module_url" "../$module_name"
+            if [ -f "../$module_name/setup.sh" ]; then
+              cd "../$module_name"
+              bash setup.sh
+              cd "$GITHUB_WORKSPACE/kernel"
+            else
+              echo "::warning::模块 $module_name 无 setup.sh，跳过"
+            fi
+          done
+
+      # ── 编译内核 ──────────────────────────────────────────────────────────
+
+      - name: 编译内核
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kernel
+
+          export PATH="/usr/lib/ccache:$PATH"
+          export KBUILD_BUILD_USER="abk"
+          export KBUILD_BUILD_HOST="abk"
+          export KBUILD_BUILD_VERSION=1
+          export KBUILD_BUILD_TIMESTAMP="$BUILD_TIME"
+
+          # 4.19 内核: Clang + GCC cross，LLVM=1
+          make O=out \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CC="ccache clang" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            LLVM=1 \
+            "$DEFCONFIG"
+
+          make -j"$(nproc --all)" O=out \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CC="ccache clang" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            LLVM=1
+
+          echo "--- 编译完成 ---"
+          ls -lh out/arch/arm64/boot/Image* 2>/dev/null || {
+            echo "::error::未找到内核镜像产物"
+            exit 1
+          }
+          ccache -s
+
+      # ── 打包 AnyKernel3 ──────────────────────────────────────────────────
+
+      - name: 打包 AnyKernel3
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git clone https://github.com/osm0sis/AnyKernel3.git --depth=1
+          rm -rf AnyKernel3/.git
+
+          # 查找内核镜像 (Image.gz-dtb > Image.gz > Image)
+          KERNEL_IMAGE=$(find kernel/out/arch/arm64/boot \
+            -name "Image.gz-dtb" -o -name "Image.gz" -o -name "Image" | head -n 1)
+          if [ -z "$KERNEL_IMAGE" ]; then
+            echo "::error::未找到内核镜像"
+            exit 1
+          fi
+          cp "$KERNEL_IMAGE" AnyKernel3/
+          echo "--- 复制内核镜像: $(basename $KERNEL_IMAGE) ---"
+
+          # 生成适配 OnePlus 6 的 anykernel.sh
+          cat > AnyKernel3/anykernel.sh << 'AKSH'
+          ### AnyKernel3 Ramdisk Mod Script
+          ## osm0sis @ xda-developers
+
+          ### AnyKernel setup
+          properties() { '
+          kernel.string=ABK Legacy · ReSukiSU · __DEVICE_DISPLAY__ · __BUILD_DATE__
+          do.devicecheck=0
+          do.modules=0
+          do.systemless=0
+          do.cleanup=1
+          do.cleanuponabort=0
+          supported.versions=
+          supported.patchlevels=
+          '; }
+
+          block=boot;
+          is_slot_device=auto;
+          ramdisk_compression=auto;
+          patch_vbmeta_flag=auto;
+
+          . tools/ak3-core.sh;
+
+          ## AnyKernel boot install
+          dump_boot;
+
+          vbmeta_disable_verification;
+
+          write_boot;
+          ## end boot install
+          AKSH
+
+          # 替换占位符
+          sed -i "s/__DEVICE_DISPLAY__/${DEVICE_DISPLAY}/g" AnyKernel3/anykernel.sh
+          sed -i "s/__BUILD_DATE__/$(date -u '+%Y-%m-%d')/g" AnyKernel3/anykernel.sh
+
+          cd AnyKernel3
+          ZIP_NAME="ABK_Legacy_${DEVICE_NAME}_ReSukiSU_${VERSION_LABEL}.zip"
+          zip -r9 "../${ZIP_NAME}" ./*
+          cd ..
+          echo "--- AK3 打包完成 ---"
+          ls -lh "${ZIP_NAME}"
+
+          echo "ARTIFACT_NAME=ABK_Legacy_${DEVICE_NAME}_ReSukiSU_${VERSION_LABEL}" >> "$GITHUB_ENV"
+
+      # ── 上传产物 ──────────────────────────────────────────────────────────
+
+      - name: 上传 AnyKernel3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ABK_Legacy_*.zip
+          if-no-files-found: error
