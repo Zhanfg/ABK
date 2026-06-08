@@ -197,7 +197,7 @@ jobs:
 
           # 应用预生成的补丁文件，注入所有必需的 KSU hook
           # 补丁包含: fs/exec.c, fs/open.c, fs/stat.c, kernel/reboot.c, drivers/input/input.c
-          patch -p1 < "$GITHUB_WORKSPACE/.github/workflows/ksu_hooks_4.19.patch"
+          patch -p1 < "$GITHUB_WORKSPACE/patches/ksu_hooks_4.19.patch"
           echo "  ✓ KSU hooks 补丁应用成功"
 
           echo "--- 写入 ReSukiSU 内核配置 ---"
