@@ -204,10 +204,37 @@ jobs:
           DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
           cat >> "$DEFCONFIG_FILE" <<'CONF'
           CONFIG_KSU=y
+          CONF
+
+          # 根据 SuSFS 开关选择 hook 模式
+          if [ "$ENABLE_SUSFS" = "true" ]; then
+            cat >> "$DEFCONFIG_FILE" <<'SUSFS_CONF'
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_SU=n
+          SUSFS_CONF
+            echo "  ✓ 使用 SuSFS inline hook 模式"
+          else
+            cat >> "$DEFCONFIG_FILE" <<'MANUAL_CONF'
           CONFIG_KSU_MANUAL_HOOK=y
           CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y
           CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y
-          CONF
+          MANUAL_CONF
+            echo "  ✓ 使用 Manual hook 模式"
+          fi
 
           echo "--- ReSukiSU 集成完成 ---"
 
@@ -217,8 +244,127 @@ jobs:
         if: ${{ inputs.enable_susfs == true }}
         shell: bash
         run: |
-          echo "::warning::SuSFS 暂不支持 4.19 内核 (susfs4ksu 补丁不完整)。跳过 SuSFS 集成。"
-          echo "SUSFS_SKIPPED=true" >> "$GITHUB_ENV"
+          set -euo pipefail
+          cd kernel
+
+          echo "--- 克隆 susfs4ksu (kernel-4.19) ---"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git \
+            -b kernel-4.19 --depth=1 ../susfs4ksu
+
+          echo "--- 复制 SuSFS 内核源文件 ---"
+          cp ../susfs4ksu/kernel_patches/fs/susfs.c           ./fs/
+          cp ../susfs4ksu/kernel_patches/fs/sus_su.c          ./fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/susfs.h      ./include/linux/
+          cp ../susfs4ksu/kernel_patches/include/linux/susfs_def.h  ./include/linux/
+          cp ../susfs4ksu/kernel_patches/include/linux/sus_su.h     ./include/linux/
+
+          echo "--- 应用 SuSFS 内核补丁 (50_add_susfs_in_kernel-4.19.patch) ---"
+          patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || {
+            echo "::warning::部分 SuSFS 补丁 hunk 失败，尝试强制应用"
+            patch -p1 --force < ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || true
+          }
+          echo "  ✓ SuSFS 内核补丁应用完成"
+
+          echo "--- 手动添加 SuSFS Kconfig 到 ReSukiSU ---"
+          # 在 ReSukiSU 的 Kconfig 中添加 SuSFS 配置菜单
+          if [ -f KernelSU/Kconfig ]; then
+            # 在 KSU config 末尾添加 SuSFS 配置
+            cat >> KernelSU/Kconfig <<'SUSFS_Kconfig'
+
+          config KSU_SUSFS
+          	bool "Enable SuSFS (Suspicious FS)"
+          	default y
+          	help
+          	  Enable SuSFS support for hiding files and processes.
+
+          config KSU_SUSFS_HAS_MAGIC_MOUNT
+          	bool "SuSFS has Magic Mount support"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SUS_PATH
+          	bool "Enable sus_path"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SUS_KSTAT
+          	bool "Enable sus_kstat"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SUS_OVERLAYFS
+          	bool "Enable sus_overlayfs"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_TRY_UMOUNT
+          	bool "Enable try_umount"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SPOOF_UNAME
+          	bool "Enable uname spoofing"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_ENABLE_LOG
+          	bool "Enable SuSFS logging"
+          	depends on KSU_SUSFS
+          	default n
+
+          config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+          	bool "Hide KSU/SuSFS symbols from kallsyms"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+          	bool "Enable cmdline/bootconfig spoofing"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_OPEN_REDIRECT
+          	bool "Enable open_redirect"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_SUS_MOUNT
+          	bool "Enable sus_mount"
+          	depends on KSU_SUSFS
+          	default y
+
+          config KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+          	bool "Auto add sus mount for KSU default mount"
+          	depends on KSU_SUSFS_SUS_MOUNT
+          	default y
+
+          config KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+          	bool "Auto add sus mount for bind mount"
+          	depends on KSU_SUSFS_SUS_MOUNT
+          	default y
+
+          config KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+          	bool "Auto add try_umount for bind mount"
+          	depends on KSU_SUSFS_TRY_UMOUNT
+          	default y
+
+          config KSU_SUSFS_SUS_SU
+          	bool "Enable sus_su (deprecated)"
+          	depends on KSU_SUSFS
+          	default n
+          SUSFS_Kconfig
+            echo "  ✓ SuSFS Kconfig 添加到 ReSukiSU"
+          fi
+
+          echo "--- 修补 ReSukiSU Kbuild: 跳过 manual hook 检查 (SuSFS 模式) ---"
+          # 当 CONFIG_KSU_SUSFS=y 时，跳过 manual hook check
+          if [ -f KernelSU/Kbuild ]; then
+            # 在 manual_hook_check.mk 包含前添加条件判断
+            sed -i '/include.*manual_hook_check\.mk/i\# SuSFS mode: skip manual hook checks for 4.19 non-GKI\nifneq ($(CONFIG_KSU_SUSFS),y)' KernelSU/Kbuild
+            sed -i '/include.*manual_hook_check\.mk/a\endif' KernelSU/Kbuild
+            echo "  ✓ ReSukiSU Kbuild 修补完成"
+          fi
+
+          echo "--- SuSFS 集成完成 ---"
 
       # ── 额外补丁 ──────────────────────────────────────────────────────────
 
@@ -228,6 +374,36 @@ jobs:
         run: |
           set -euo pipefail
           cd kernel
+
+          echo "--- 克隆 ZRAM LZ4KD 补丁 ---"
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git --depth=1 ../SukiSU_patch 2>/dev/null || true
+
+          echo "--- 应用 ZRAM LZ4KD 源文件 ---"
+          if [ -d ../SukiSU_patch/other/zram ]; then
+            # 复制 LZ4KD 头文件
+            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/ 2>/dev/null || true
+            # 复制 LZ4KD 库文件
+            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib/ 2>/dev/null || true
+            # 复制 LZ4KD 加密文件
+            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/ 2>/dev/null || true
+            # 复制 OPLUS LZ4K 文件
+            cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./lib/ 2>/dev/null || true
+
+            # 应用 ZRAM 补丁
+            ZRAM_PATCH="../SukiSU_patch/other/zram/zram_patch/4.19/lz4kd.patch"
+            if [ -f "$ZRAM_PATCH" ]; then
+              patch -p1 < "$ZRAM_PATCH" || echo "::warning::ZRAM lz4kd 补丁部分失败"
+            fi
+            OPLUS_PATCH="../SukiSU_patch/other/zram/zram_patch/4.19/lz4k_oplus.patch"
+            if [ -f "$OPLUS_PATCH" ]; then
+              patch -p1 < "$OPLUS_PATCH" || echo "::warning::ZRAM lz4k_oplus 补丁部分失败"
+            fi
+            echo "  ✓ ZRAM LZ4KD 源文件和补丁已应用"
+          else
+            echo "::warning::SukiSU_patch 中没有 ZRAM 补丁，仅追加配置"
+          fi
+
+          # 追加 ZRAM 配置选项
           DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
           cat >> "$DEFCONFIG_FILE" <<'CONF'
           CONFIG_ZSMALLOC=y
