@@ -117,15 +117,17 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1
           rm -rf AnyKernel3/.git
 
+          # Find kernel image - prefer compressed, then uncompressed
           KERNEL_IMAGE=$(find out/arch/arm64/boot \
-            -name "Image.gz-dtb" -o -name "Image.gz" -o -name "Image" | head -n 1)
+            -name "Image.gz-dtb" -o -name "Image.gz" -o -name "Image-dtb" -o -name "Image" | head -n 1)
           if [ -z "$KERNEL_IMAGE" ]; then
             echo "::error::未找到内核镜像"
             exit 1
           fi
+          echo "Found kernel image: $KERNEL_IMAGE"
           cp "$KERNEL_IMAGE" AnyKernel3/
 
-          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMuMS4wIEJCUjIrTFo0S0QrTlRTWU5DK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cD0xCmRvLmNsZWFudXBvbmFib3J0PTAKc3VwcG9ydGVkLnZlcnNpb25zPQpzdXBwb3J0ZWQucGF0Y2hsZXZlbHM9Cic7IH0KCmJsb2NrPWJvb3Q7CmlzX3Nsb3RfZGV2aWNlPWF1dG87CnJhbWRpc2tfY29tcHJlc3Npb249YXV0bzsKcGF0Y2hfdmJtZXRhX2ZsYWc9YXV0bzsKCi4gdG9vbHMvYWszLWNvcmUuc2g7CgojIyBBbnlLZXJuZWwgYm9vdCBpbnN0YWxsCmR1bXBfYm9vdDsKCnZibWV0YV9kaXNhYmxlX3ZlcmlmaWNhdGlvbjsKCndyaXRlX2Jvb3Q7CiMjIGVuZCBib290IGluc3RhbGwK" | base64 -d > AnyKernel3/anykernel.sh
+          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAo=" | base64 -d > AnyKernel3/anykernel.sh
 
           cd AnyKernel3
           ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
