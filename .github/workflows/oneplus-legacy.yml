@@ -125,6 +125,36 @@ jobs:
 
           ls -lh out/arch/arm64/boot/Image.gz-dtb
           echo "--- 压缩完成 ---"
+
+          # Build dtbo.img from compiled DTBO overlays (OnePlus 6 requires this)
+          echo "--- 从源码重建 dtbo.img ---"
+          DTBO_DIR=out/arch/arm64/boot/dts/qcom
+          DTBO_FILES=$(find "$DTBO_DIR" -name "enchilada*.dtbo" -o -name "fajita*.dtbo" 2>/dev/null | sort)
+          if [ -n "$DTBO_FILES" ]; then
+            echo "找到 DTBO 覆盖层:"
+            echo "$DTBO_FILES" | while read f; do ls -lh "$f"; done
+            # Create dtbo.img using mkdtboimg.py (download from Android sources)
+            curl -sL "https://raw.githubusercontent.com/nickyzhang/platform_system_libufdt/master/utils/mkdtboimg.py" -o /tmp/mkdtboimg.py 2>/dev/null || true
+            curl -sL "https://raw.githubusercontent.com/nickyzhang/platform_system_tools_mkdtboimg/master/mkdtboimg.py" -o /tmp/mkdtboimg.py 2>/dev/null || true
+            chmod +x /tmp/mkdtboimg.py 2>/dev/null || true
+            if [ -s /tmp/mkdtboimg.py ]; then
+              python3 /tmp/mkdtboimg.py create "$DTBO_DIR/dtbo.img" $DTBO_FILES
+              echo "✓ dtbo.img 已从源码重建"
+            else
+              # Fallback: concatenate dtbo files manually
+              echo "mkdtboimg.py 不可用，使用 fallback 方式"
+              cat $DTBO_FILES > "$DTBO_DIR/dtbo.img"
+              echo "✓ dtbo.img 已通过 fallback 方式重建"
+            fi
+            ls -lh "$DTBO_DIR/dtbo.img"
+            cp "$DTBO_DIR/dtbo.img" AnyKernel3/
+          else
+            echo "::warning::未找到 enchilada/fajita DTBO 文件，使用预置 dtbo.img"
+            if [ -f "../../dtbo.img" ]; then
+              cp ../../dtbo.img AnyKernel3/
+            fi
+          fi
+
           ccache -s
 
       - name: 打包 AnyKernel3
@@ -149,17 +179,24 @@ jobs:
           echo "Found kernel image: $KERNEL_IMAGE"
           cp "$KERNEL_IMAGE" AnyKernel3/
 
-          # Also copy dtbo.img if exists in source tree
-          DTBO_IMG=$(find arch/arm64/boot/dts -name "dtbo.img" 2>/dev/null | head -n 1)
-          if [ -n "$DTBO_IMG" ]; then
-            echo "Found dtbo.img: $DTBO_IMG"
-            cp "$DTBO_IMG" AnyKernel3/
+          # Also copy dtbo.img from ABK repo root
+          echo "--- 查找 dtbo.img ---"
+          echo "PWD: $(pwd)"
+          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-not set}"
+          ls -la ../../dtbo.img 2>&1 || echo "ABK 根目录无 dtbo.img"
+          ls -la ../dtbo.img 2>&1 || echo "kernel/ 目录无 dtbo.img"
+
+          if [ -f "../../dtbo.img" ]; then
+            echo "✓ 从 ABK 根目录复制 dtbo.img"
+            cp ../../dtbo.img AnyKernel3/
           elif [ -f "../dtbo.img" ]; then
-            echo "Using local dtbo.img from ABK root"
-            cp "../dtbo.img" AnyKernel3/
+            echo "✓ 从 kernel/ 目录复制 dtbo.img"
+            cp ../dtbo.img AnyKernel3/
           else
-            echo "Warning: dtbo.img not found"
+            echo "::error::dtbo.img 未找到！设备需要此文件"
+            exit 1
           fi
+          ls -lh AnyKernel3/dtbo.img
 
           # Also copy vbmeta-disable-verification tool from original AK3
           if [ -f "AnyKernel3/dtbo.img" ] || [ -f "../dtbo.img" ]; then
@@ -171,7 +208,7 @@ jobs:
             fi
           fi
 
-          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAo=" | base64 -d > AnyKernel3/anykernel.sh
+          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAoKIyMgZHRib19pbWcgZmxhc2ggKE9uZVBsdXMgNiByZXF1aXJlcyBzZXBhcmF0ZSBkdGJvIHBhcnRpdGlvbikKaWYgWyAtZiAiZHRib19pbWciIF07IHRoZW4KICBibG9jaz0kKGR1bXBfZHRib19wYXJ0aXRpb24pCiAgd3JpdGVfZHRibwpmaQ==" | base64 -d > AnyKernel3/anykernel.sh
 
           cd AnyKernel3
           ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
