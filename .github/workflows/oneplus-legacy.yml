@@ -184,22 +184,16 @@ jobs:
           cd kernel
           curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
 
-          echo "--- 修复 ReSukiSU Kbuild: 强制使用 KPROBE hooks ---"
-          # 4.19 Non-GKI 内核不支持 Tracepoint hooks (GKI 2.0 only)
-          # 强制使用 KPROBE hooks
+          echo "--- 修复 ReSukiSU: 强制 Manual Hook (4.19 Non-GKI) ---"
           DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
-          cat >> "$DEFCONFIG_FILE" <<'CONF'
-          CONFIG_KSU_KPROBE_HOOKS=y
-          CONF
-          # 同时修改 Kbuild 中的 TP hook 强制检查，防止编译报错
-          if [ -f drivers/kernelsu/Kbuild ]; then
-            sed -i 's/^ifeq.*TP hooks are incompatible.*$/# TP hooks check bypassed for 4.19 Non-GKI/' \
-              drivers/kernelsu/Kbuild || true
-            sed -i 's/^	@echo ".*TP hooks are incompatible.*"/# bypassed/' \
-              drivers/kernelsu/Kbuild || true
-            sed -i 's/^	@false$/# bypassed for 4.19/' \
-              drivers/kernelsu/Kbuild || true
+
+          # 确保不启用 TP hooks (仅 GKI 2.0 支持)
+          sed -i '/CONFIG_KSU_TRACEPOINT_HOOK/d' "$DEFCONFIG_FILE" 2>/dev/null || true
+          # 强制使用 Manual Hook 模式 (兼容 4.19 Non-GKI)
+          if ! grep -q "CONFIG_KSU_MANUAL_HOOK" "$DEFCONFIG_FILE"; then
+            echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$DEFCONFIG_FILE"
           fi
+
           echo "--- ReSukiSU 集成完成 ---"
 
       # ── 集成 SuSFS ───────────────────────────────────────────────────────
