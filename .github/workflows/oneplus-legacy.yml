@@ -137,20 +137,14 @@ jobs:
           find "$DTBO_DIR" -name "enchilada*.dtbo" -o -name "fajita*.dtbo" | sort
 
           # Build dtbo.img from compiled DTBO overlays (OnePlus 6 requires this)
-          # Priority: 1) ABK root dtbo.img (pre-built 8.4MB) 2) rebuilt from source
+          # Priority: 1) Download from ABK repo (raw URL) 2) Local file 3) rebuilt from source
           echo "--- 准备 dtbo.img ---"
-          echo "PWD: $(pwd)"
-          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-not set}"
-          ls -la ../dtbo.img 2>&1 || echo "无 ../dtbo.img"
-          ls -la ../../dtbo.img 2>&1 || echo "无 ../../dtbo.img"
-          ls -la /home/runner/work/ABK/ABK/dtbo.img 2>&1 || echo "无绝对路径 dtbo.img"
           DTBO_DIR=out/arch/arm64/boot/dts/qcom
           if [ -f "../dtbo.img" ]; then
-            echo "✓ 使用 ../dtbo.img (ABK 根目录的完整 8.4MB dtbo.img)"
+            echo "✓ 使用本地 ../dtbo.img"
             cp ../dtbo.img ./dtbo.img
-          elif [ -f "/home/runner/work/ABK/ABK/dtbo.img" ]; then
-            echo "✓ 使用绝对路径 dtbo.img"
-            cp /home/runner/work/ABK/ABK/dtbo.img ./dtbo.img
+          elif curl -fsL "https://raw.githubusercontent.com/Zhanfg/ABK/dev/dtbo.img" -o ./dtbo.img 2>/dev/null && [ -s ./dtbo.img ] && [ $(stat -c%s ./dtbo.img) -gt 1000000 ]; then
+            echo "✓ 从 ABK repo 下载 dtbo.img ($(du -h ./dtbo.img | cut -f1))"
           else
             echo "--- 从源码重建 dtbo.img ---"
             DTBO_FILES=$(find "$DTBO_DIR" \( -name "enchilada*.dtbo" -o -name "fajita*.dtbo" -o -name "sdm845*overlay.dtbo" \) 2>/dev/null | sort)
@@ -167,6 +161,7 @@ jobs:
               exit 1
             fi
           fi
+          ls -lh ./dtbo.img
 
           ccache -s
 
