@@ -141,5 +141,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ABK_OnePlus6_*.zip
+          path: kernel/ABK_OnePlus6_*.zip
           if-no-files-found: error
