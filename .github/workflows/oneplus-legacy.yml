@@ -1,4 +1,4 @@
-name: OnePlus Legacy 内核构建 (4.19 非GKI)
+name: OnePlus 6 内核编译 (4.19 预集成源码)
 
 permissions:
   contents: write
@@ -6,88 +6,20 @@ permissions:
 
 on:
   workflow_dispatch:
-    inputs:
-      kernel_source:
-        description: "内核源码仓库 URL"
-        required: false
-        type: string
-        default: "https://github.com/shinichi-c/android_kernel_oneplus_sdm845"
-      kernel_branch:
-        description: "内核分支"
-        required: false
-        type: string
-        default: "lineage-23.0-4.19"
-      device_name:
-        description: "设备 (enchilada / fajita / dumpling)"
-        required: true
-        type: choice
-        options:
-          - enchilada
-          - fajita
-          - dumpling
-      defconfig:
-        description: "Defconfig (相对于 arch/arm64/configs/)"
-        required: false
-        type: string
-        default: "vendor/enchilada_defconfig"
-      enable_susfs:
-        description: "启用 SuSFS"
-        required: false
-        type: boolean
-        default: true
-      use_zram:
-        description: "ZRAM LZ4KD 优化"
-        required: false
-        type: boolean
-        default: false
-      use_bbg:
-        description: "Baseband Guard"
-        required: false
-        type: boolean
-        default: false
-      use_custom_external_modules:
-        description: "启用自定义外部模块"
-        required: false
-        type: boolean
-        default: false
-      custom_external_modules:
-        description: "外部模块清单 (URL;阶段|URL;阶段)"
-        required: false
-        type: string
-        default: ""
-      version:
-        description: "自定义版本标签 (留空自动生成)"
-        required: false
-        type: string
-        default: ""
-      build_time:
-        description: "自定义构建时间 (留空自动生成)"
-        required: false
-        type: string
-        default: ""
 
 env:
-  KERNEL_SOURCE: ${{ inputs.kernel_source }}
-  KERNEL_BRANCH: ${{ inputs.kernel_branch }}
-  DEVICE_NAME: ${{ inputs.device_name }}
-  DEFCONFIG: ${{ inputs.defconfig }}
-  ENABLE_SUSFS: ${{ inputs.enable_susfs }}
-  USE_ZRAM: ${{ inputs.use_zram }}
-  USE_BBG: ${{ inputs.use_bbg }}
-  USE_CUSTOM_EXTERNAL_MODULES: ${{ inputs.use_custom_external_modules }}
-  CUSTOM_EXTERNAL_MODULES: ${{ inputs.custom_external_modules }}
-  CUSTOM_VERSION: ${{ inputs.version }}
-  CUSTOM_BUILD_TIME: ${{ inputs.build_time }}
+  KERNEL_SOURCE: "https://github.com/Zhanfg/kernel_oneplus_sdm845"
+  KERNEL_BRANCH: "master"
+  DEVICE_NAME: "enchilada"
+  DEFCONFIG: "vendor/enchilada_defconfig"
 
 jobs:
   build:
-    name: "legacy-${{ inputs.device_name }}-4.19"
+    name: "build-enchilada-4.19"
     runs-on: ubuntu-22.04
     timeout-minutes: 120
 
     steps:
-      # ── 环境准备 ──────────────────────────────────────────────────────────
-
       - name: 检出 ABK 仓库
         uses: actions/checkout@v4
 
@@ -104,7 +36,6 @@ jobs:
       - name: 安装构建依赖
         shell: bash
         run: |
-          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
             git build-essential bc flex bison libssl-dev \
@@ -116,54 +47,9 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           max-size: 2G
-          key: legacy-${{ inputs.device_name }}-4.19
+          key: build-enchilada-4.19
 
-      - name: 构建信息摘要
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -n "$CUSTOM_VERSION" ]; then
-            VERSION_LABEL="$CUSTOM_VERSION"
-          else
-            VERSION_LABEL="ABK-legacy-${DEVICE_NAME}-$(date -u '+%Y%m%d-%H%M')"
-          fi
-          if [ -n "$CUSTOM_BUILD_TIME" ]; then
-            BUILD_TIME="$CUSTOM_BUILD_TIME"
-          else
-            BUILD_TIME="$(date -u '+%Y%m%d%H%M%S')"
-          fi
-
-          case "$DEVICE_NAME" in
-            enchilada) DEVICE_DISPLAY="OnePlus 6" ;;
-            fajita)    DEVICE_DISPLAY="OnePlus 6T" ;;
-            dumpling)  DEVICE_DISPLAY="OnePlus 6T (CN)" ;;
-            *)         DEVICE_DISPLAY="$DEVICE_NAME" ;;
-          esac
-
-          echo "VERSION_LABEL=$VERSION_LABEL" >> "$GITHUB_ENV"
-          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
-          echo "DEVICE_DISPLAY=$DEVICE_DISPLAY" >> "$GITHUB_ENV"
-
-          echo "========================================"
-          echo "    ABK Legacy 内核构建配置"
-          echo "========================================"
-          echo "构建目标      : OnePlus Legacy (非GKI)"
-          echo "设备          : ${DEVICE_DISPLAY} (${DEVICE_NAME})"
-          echo "内核源码      : ${KERNEL_SOURCE}"
-          echo "内核分支      : ${KERNEL_BRANCH}"
-          echo "Defconfig     : ${DEFCONFIG}"
-          echo "内核版本      : 4.19"
-          echo "Root 方案     : ReSukiSU (non-GKI)"
-          echo "SuSFS         : ${ENABLE_SUSFS}"
-          echo "ZRAM LZ4KD    : ${USE_ZRAM}"
-          echo "BBG           : ${USE_BBG}"
-          echo "版本标签      : ${VERSION_LABEL}"
-          echo "========================================"
-
-      # ── 拉取内核源码 ──────────────────────────────────────────────────────
-
-      - name: 克隆内核源码
+      - name: 克隆预集成内核源码
         shell: bash
         run: |
           set -euo pipefail
@@ -173,282 +59,8 @@ jobs:
           cd kernel
           sed -i 's/ -dirty//g' scripts/setlocalversion
           sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' scripts/setlocalversion
-          git add -A && git commit -m "Remove -dirty suffix"
-
-      # ── 集成 ReSukiSU ────────────────────────────────────────────────────
-
-      - name: 集成 ReSukiSU + 内核 Hook 注入
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd kernel
-
-          echo "--- 克隆 ReSukiSU ---"
-          git clone https://github.com/ReSukiSU/ReSukiSU KernelSU --depth=1
-          cd KernelSU && git checkout main && cd ..
-
-          echo "--- 注册 ReSukiSU 到构建系统 ---"
-          ln -sf "$(pwd)/KernelSU/kernel" drivers/kernelsu
-          grep -q "kernelsu" drivers/Makefile || echo "obj-\$(CONFIG_KSU) += kernelsu/" >> drivers/Makefile
-          grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || \
-            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
-
-          echo "--- 应用 KSU Hook 补丁 (4.19 手动集成) ---"
-
-          # 直接从 base64 解码补丁内容（避免 checkout 清理问题）
-          echo "LS0tIGEvZnMvZXhlYy5jCisrKyBiL2ZzL2V4ZWMuYwpAQCAtMTg5NSwxMSArMTg5NSwxOSBAQAogCXJldHVybiByZXR2YWw7CiB9CiAKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCitleHRlcm4gaW50IGtzdV9oYW5kbGVfZXhlY3ZlYXQoaW50ICpmZCwgc3RydWN0IGZpbGVuYW1lICoqZmlsZW5hbWVfcHRyLCB2b2lkICphcmd2LAorCQkJICAgICAgdm9pZCAqZW52cCwgaW50ICpmbGFncyk7CisjZW5kaWYKKwogc3RhdGljIGludCBkb19leGVjdmVhdF9jb21tb24oaW50IGZkLCBzdHJ1Y3QgZmlsZW5hbWUgKmZpbGVuYW1lLAogCQkJICAgICAgc3RydWN0IHVzZXJfYXJnX3B0ciBhcmd2LAogCQkJICAgICAgc3RydWN0IHVzZXJfYXJnX3B0ciBlbnZwLAogCQkJICAgICAgaW50IGZsYWdzKQogeworI2lmIElTX0VOQUJMRUQoQ09ORklHX0tTVSkKKwlrc3VfaGFuZGxlX2V4ZWN2ZWF0KCZmZCwgJmZpbGVuYW1lLCAmYXJndiwgJmVudnAsICZmbGFncyk7CisjZW5kaWYKIAlyZXR1cm4gX19kb19leGVjdmVfZmlsZShmZCwgZmlsZW5hbWUsIGFyZ3YsIGVudnAsIGZsYWdzLCBOVUxMKTsKIH0KIAotLS0gYS9mcy9vcGVuLmMKKysrIGIvZnMvb3Blbi5jCkBAIC0zNTMsNiArMzUzLDExIEBACiAgKiBXZSBkbyB0aGlzIGJ5IHRlbXBvcmFyaWx5IGNsZWFyaW5nIGFsbCBGUy1yZWxhdGVkIGNhcGFiaWxpdGllcyBhbmQKICAqIHN3aXRjaGluZyB0aGUgZnN1aWQvZnNnaWQgYXJvdW5kIHRvIHRoZSByZWFsIG9uZXMuCiAgKi8KKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCitleHRlcm4gaW50IGtzdV9oYW5kbGVfZmFjY2Vzc2F0KGludCAqZGZkLCBjb25zdCBjaGFyIF9fdXNlciAqKmZpbGVuYW1lX3VzZXIsIGludCAqbW9kZSwKKwkJCSAgICAgIGludCAqZmxhZ3MpOworI2VuZGlmCisKIGxvbmcgZG9fZmFjY2Vzc2F0KGludCBkZmQsIGNvbnN0IGNoYXIgX191c2VyICpmaWxlbmFtZSwgaW50IG1vZGUpCiB7CiAJY29uc3Qgc3RydWN0IGNyZWQgKm9sZF9jcmVkOwpAQCAtMzYyLDYgKzM2Nyw5IEBACiAJc3RydWN0IHZmc21vdW50ICptbnQ7CiAJaW50IHJlczsKIAl1bnNpZ25lZCBpbnQgbG9va3VwX2ZsYWdzID0gTE9PS1VQX0ZPTExPVzsKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCisJa3N1X2hhbmRsZV9mYWNjZXNzYXQoJmRmZCwgJmZpbGVuYW1lLCAmbW9kZSwgTlVMTCk7CisjZW5kaWYKIAogCWlmIChtb2RlICYgflNfSVJXWE8pCS8qIHdoZXJlJ3MgRl9PSywgWF9PSywgV19PSywgUl9PSz8gKi8KIAkJcmV0dXJuIC1FSU5WQUw7Ci0tLSBhL2ZzL3N0YXQuYworKysgYi9mcy9zdGF0LmMKQEAgLTE2MywxMiArMTYzLDIxIEBACiAgKgogICogMCB3aWxsIGJlIHJldHVybmVkIG9uIHN1Y2Nlc3MsIGFuZCBhIC12ZSBlcnJvciBjb2RlIGlmIHVuc3VjY2Vzc2Z1bC4KICAqLworI2lmIElTX0VOQUJMRUQoQ09ORklHX0tTVSkKK2V4dGVybiBpbnQga3N1X2hhbmRsZV9zdGF0KGludCAqZGZkLCBjb25zdCBjaGFyIF9fdXNlciAqKmZpbGVuYW1lX3VzZXIsIGludCAqZmxhZ3MpOworZXh0ZXJuIHZvaWQga3N1X2hhbmRsZV9uZXdmc3RhdF9yZXQodW5zaWduZWQgaW50ICpmZCwgc3RydWN0IHN0YXQgX191c2VyICoqc3RhdGJ1Zl9wdHIpOworZXh0ZXJuIHZvaWQga3N1X2hhbmRsZV9mc3RhdDY0X3JldCh1bnNpZ25lZCBsb25nICpmZCwgc3RydWN0IHN0YXQ2NCBfX3VzZXIgKipzdGF0YnVmX3B0cik7CisjZW5kaWYKKwogaW50IHZmc19zdGF0eChpbnQgZGZkLCBjb25zdCBjaGFyIF9fdXNlciAqZmlsZW5hbWUsIGludCBmbGFncywKIAkgICAgICBzdHJ1Y3Qga3N0YXQgKnN0YXQsIHUzMiByZXF1ZXN0X21hc2spCiB7CiAJc3RydWN0IHBhdGggcGF0aDsKIAlpbnQgZXJyb3IgPSAtRUlOVkFMOwogCXVuc2lnbmVkIGludCBsb29rdXBfZmxhZ3MgPSBMT09LVVBfRk9MTE9XIHwgTE9PS1VQX0FVVE9NT1VOVDsKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCisJa3N1X2hhbmRsZV9zdGF0KCZkZmQsICZmaWxlbmFtZSwgJmZsYWdzKTsKKyNlbmRpZgogCiAJaWYgKChmbGFncyAmIH4oQVRfU1lNTElOS19OT0ZPTExPVyB8IEFUX05PX0FVVE9NT1VOVCB8CiAJCSAgICAgICBBVF9FTVBUWV9QQVRIIHwgS1NUQVRfUVVFUllfRkxBR1MpKSAhPSAwKQpAQCAtMzc0LDYgKzM4Myw5IEBACiAKIAlpZiAoIWVycm9yKQogCQllcnJvciA9IGNwX25ld19zdGF0KCZzdGF0LCBzdGF0YnVmKTsKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCisJaWYgKCFlcnJvcikga3N1X2hhbmRsZV9uZXdmc3RhdF9yZXQoJmZkLCAmc3RhdGJ1Zik7CisjZW5kaWYKIAogCXJldHVybiBlcnJvcjsKIH0KQEAgLTUwMCw2ICs1MTIsOSBAQAogCiAJaWYgKCFlcnJvcikKIAkJZXJyb3IgPSBjcF9uZXdfc3RhdDY0KCZzdGF0LCBzdGF0YnVmKTsKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCisJaWYgKCFlcnJvcikga3N1X2hhbmRsZV9mc3RhdDY0X3JldCgmZmQsICZzdGF0YnVmKTsKKyNlbmRpZgogCiAJcmV0dXJuIGVycm9yOwogfQotLS0gYS9rZXJuZWwvcmVib290LmMKKysrIGIva2VybmVsL3JlYm9vdC5jCkBAIC0zMDUsNiArMzA1LDEwIEBACiAgKgogICogcmVib290IGRvZXNuJ3Qgc3luYzogZG8gdGhhdCB5b3Vyc2VsZiBiZWZvcmUgY2FsbGluZyB0aGlzLgogICovCisjaWZkZWYgQ09ORklHX0tTVQorZXh0ZXJuIGludCBrc3VfaGFuZGxlX3N5c19yZWJvb3QoaW50IG1hZ2ljMSwgaW50IG1hZ2ljMiwgdW5zaWduZWQgaW50IGNtZCwgdm9pZCBfX3VzZXIgKiphcmcpOworI2VuZGlmCisKIFNZU0NBTExfREVGSU5FNChyZWJvb3QsIGludCwgbWFnaWMxLCBpbnQsIG1hZ2ljMiwgdW5zaWduZWQgaW50LCBjbWQsCiAJCXZvaWQgX191c2VyICosIGFyZykKIHsKQEAgLTMxMyw2ICszMTcsOSBAQAogCWludCByZXQgPSAwOwogCiAJLyogV2Ugb25seSB0cnVzdCB0aGUgc3VwZXJ1c2VyIHdpdGggcmVib290aW5nIHRoZSBzeXN0ZW0uICovCisjaWZkZWYgQ09ORklHX0tTVQorCWtzdV9oYW5kbGVfc3lzX3JlYm9vdChtYWdpYzEsIG1hZ2ljMiwgY21kLCAmYXJnKTsKKyNlbmRpZgogCWlmICghbnNfY2FwYWJsZShwaWRfbnMtPnVzZXJfbnMsIENBUF9TWVNfQk9PVCkpCiAJCXJldHVybiAtRVBFUk07CiAKLS0tIGEvZHJpdmVycy9pbnB1dC9pbnB1dC5jCisrKyBiL2RyaXZlcnMvaW5wdXQvaW5wdXQuYwpAQCAtMzc4LDEwICszNzgsMTcgQEAKIAlyZXR1cm4gZGlzcG9zaXRpb247CiB9CiAKKyNpZiBJU19FTkFCTEVEKENPTkZJR19LU1UpCitleHRlcm4gaW50IGtzdV9oYW5kbGVfaW5wdXRfaGFuZGxlX2V2ZW50KHVuc2lnbmVkIGludCAqdHlwZSwgdW5zaWduZWQgaW50ICpjb2RlLCBpbnQgKnZhbHVlKTsKKyNlbmRpZgorCiBzdGF0aWMgdm9pZCBpbnB1dF9oYW5kbGVfZXZlbnQoc3RydWN0IGlucHV0X2RldiAqZGV2LAogCQkJICAgICAgIHVuc2lnbmVkIGludCB0eXBlLCB1bnNpZ25lZCBpbnQgY29kZSwgaW50IHZhbHVlKQogewogCWludCBkaXNwb3NpdGlvbiA9IGlucHV0X2dldF9kaXNwb3NpdGlvbihkZXYsIHR5cGUsIGNvZGUsICZ2YWx1ZSk7CisjaWYgSVNfRU5BQkxFRChDT05GSUdfS1NVKQorCWtzdV9oYW5kbGVfaW5wdXRfaGFuZGxlX2V2ZW50KCZ0eXBlLCAmY29kZSwgJnZhbHVlKTsKKyNlbmRpZgogCiAJaWYgKGRpc3Bvc2l0aW9uICE9IElOUFVUX0lHTk9SRV9FVkVOVCAmJiB0eXBlICE9IEVWX1NZTikKIAkJYWRkX2lucHV0X3JhbmRvbW5lc3ModHlwZSwgY29kZSwgdmFsdWUpOwo=" | base64 -d > /tmp/ksu_hooks.patch
-          patch -p1 < /tmp/ksu_hooks.patch
-          echo "  ✓ KSU hooks 补丁应用成功"
-
-          echo "--- 写入 ReSukiSU 内核配置 ---"
-          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
-          cat >> "$DEFCONFIG_FILE" <<'CONF'
-          CONFIG_KSU=y
-          CONF
-
-          # 根据 SuSFS 开关选择 hook 模式
-          if [ "$ENABLE_SUSFS" = "true" ]; then
-            cat >> "$DEFCONFIG_FILE" <<'SUSFS_CONF'
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_SU=n
-          SUSFS_CONF
-            echo "  ✓ 使用 SuSFS inline hook 模式"
-          else
-            cat >> "$DEFCONFIG_FILE" <<'MANUAL_CONF'
-          CONFIG_KSU_MANUAL_HOOK=y
-          CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK=y
-          CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK=y
-          MANUAL_CONF
-            echo "  ✓ 使用 Manual hook 模式"
-          fi
-
-          echo "--- ReSukiSU 集成完成 ---"
-
-      # ── 集成 SuSFS ───────────────────────────────────────────────────────
-
-      - name: 集成 SuSFS
-        if: ${{ inputs.enable_susfs == true }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd kernel
-
-          echo "--- 克隆 susfs4ksu (kernel-4.19) ---"
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git \
-            -b kernel-4.19 --depth=1 ../susfs4ksu
-
-          echo "--- 复制 SuSFS 内核源文件 ---"
-          cp ../susfs4ksu/kernel_patches/fs/susfs.c           ./fs/
-          cp ../susfs4ksu/kernel_patches/fs/sus_su.c          ./fs/
-          cp ../susfs4ksu/kernel_patches/include/linux/susfs.h      ./include/linux/
-          cp ../susfs4ksu/kernel_patches/include/linux/susfs_def.h  ./include/linux/
-          cp ../susfs4ksu/kernel_patches/include/linux/sus_su.h     ./include/linux/
-
-          echo "--- 应用 SuSFS 内核补丁 (50_add_susfs_in_kernel-4.19.patch) ---"
-          patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || {
-            echo "::warning::部分 SuSFS 补丁 hunk 失败，尝试强制应用"
-            patch -p1 --force < ../susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || true
-          }
-          echo "  ✓ SuSFS 内核补丁应用完成"
-
-          echo "--- 手动添加 SuSFS Kconfig 到 ReSukiSU ---"
-          # 在 ReSukiSU 的 Kconfig 中添加 SuSFS 配置菜单
-          if [ -f KernelSU/Kconfig ]; then
-            # 在 KSU config 末尾添加 SuSFS 配置
-            cat >> KernelSU/Kconfig <<'SUSFS_Kconfig'
-
-          config KSU_SUSFS
-          	bool "Enable SuSFS (Suspicious FS)"
-          	default y
-          	help
-          	  Enable SuSFS support for hiding files and processes.
-
-          config KSU_SUSFS_HAS_MAGIC_MOUNT
-          	bool "SuSFS has Magic Mount support"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SUS_PATH
-          	bool "Enable sus_path"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SUS_KSTAT
-          	bool "Enable sus_kstat"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SUS_OVERLAYFS
-          	bool "Enable sus_overlayfs"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_TRY_UMOUNT
-          	bool "Enable try_umount"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SPOOF_UNAME
-          	bool "Enable uname spoofing"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_ENABLE_LOG
-          	bool "Enable SuSFS logging"
-          	depends on KSU_SUSFS
-          	default n
-
-          config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-          	bool "Hide KSU/SuSFS symbols from kallsyms"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-          	bool "Enable cmdline/bootconfig spoofing"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_OPEN_REDIRECT
-          	bool "Enable open_redirect"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_SUS_MOUNT
-          	bool "Enable sus_mount"
-          	depends on KSU_SUSFS
-          	default y
-
-          config KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-          	bool "Auto add sus mount for KSU default mount"
-          	depends on KSU_SUSFS_SUS_MOUNT
-          	default y
-
-          config KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-          	bool "Auto add sus mount for bind mount"
-          	depends on KSU_SUSFS_SUS_MOUNT
-          	default y
-
-          config KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-          	bool "Auto add try_umount for bind mount"
-          	depends on KSU_SUSFS_TRY_UMOUNT
-          	default y
-
-          config KSU_SUSFS_SUS_SU
-          	bool "Enable sus_su (deprecated)"
-          	depends on KSU_SUSFS
-          	default n
-          SUSFS_Kconfig
-            echo "  ✓ SuSFS Kconfig 添加到 ReSukiSU"
-          fi
-
-          echo "--- 修补 ReSukiSU Kbuild: 跳过 manual hook 检查 (SuSFS 模式) ---"
-          # 当 CONFIG_KSU_SUSFS=y 时，跳过 manual hook check
-          if [ -f KernelSU/Kbuild ]; then
-            # 在 manual_hook_check.mk 包含前添加条件判断
-            sed -i '/include.*manual_hook_check\.mk/i\# SuSFS mode: skip manual hook checks for 4.19 non-GKI\nifneq ($(CONFIG_KSU_SUSFS),y)' KernelSU/Kbuild
-            sed -i '/include.*manual_hook_check\.mk/a\endif' KernelSU/Kbuild
-            echo "  ✓ ReSukiSU Kbuild 修补完成"
-          fi
-
-          echo "--- SuSFS 集成完成 ---"
-
-      # ── 额外补丁 ──────────────────────────────────────────────────────────
-
-      - name: ZRAM LZ4KD 优化
-        if: ${{ inputs.use_zram == true }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd kernel
-
-          echo "--- 克隆 ZRAM LZ4KD 补丁 ---"
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git --depth=1 ../SukiSU_patch 2>/dev/null || true
-
-          echo "--- 应用 ZRAM LZ4KD 源文件 ---"
-          if [ -d ../SukiSU_patch/other/zram ]; then
-            # 复制 LZ4KD 头文件
-            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/ 2>/dev/null || true
-            # 复制 LZ4KD 库文件
-            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib/ 2>/dev/null || true
-            # 复制 LZ4KD 加密文件
-            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/ 2>/dev/null || true
-            # 复制 OPLUS LZ4K 文件
-            cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./lib/ 2>/dev/null || true
-
-            # 应用 ZRAM 补丁
-            ZRAM_PATCH="../SukiSU_patch/other/zram/zram_patch/4.19/lz4kd.patch"
-            if [ -f "$ZRAM_PATCH" ]; then
-              patch -p1 < "$ZRAM_PATCH" || echo "::warning::ZRAM lz4kd 补丁部分失败"
-            fi
-            OPLUS_PATCH="../SukiSU_patch/other/zram/zram_patch/4.19/lz4k_oplus.patch"
-            if [ -f "$OPLUS_PATCH" ]; then
-              patch -p1 < "$OPLUS_PATCH" || echo "::warning::ZRAM lz4k_oplus 补丁部分失败"
-            fi
-            echo "  ✓ ZRAM LZ4KD 源文件和补丁已应用"
-          else
-            echo "::warning::SukiSU_patch 中没有 ZRAM 补丁，仅追加配置"
-          fi
-
-          # 追加 ZRAM 配置选项
-          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
-          cat >> "$DEFCONFIG_FILE" <<'CONF'
-          CONFIG_ZSMALLOC=y
-          CONFIG_ZRAM=y
-          CONFIG_MODULE_SIG=n
-          CONFIG_CRYPTO_LZ4KD=y
-          CONFIG_ZRAM_DEF_COMP_LZ4KD=y
-          CONF
-          echo "--- ZRAM LZ4KD 配置已追加 ---"
-
-      - name: Baseband Guard
-        if: ${{ inputs.use_bbg == true }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd kernel
-          curl -fsSL https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash || {
-            echo "::warning::BBG 补丁应用失败，跳过"
-          }
-
-      - name: 自定义外部模块
-        if: ${{ inputs.use_custom_external_modules == true && inputs.custom_external_modules != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          export KERNEL_ROOT="$GITHUB_WORKSPACE/kernel"
-          export DEFCONFIG_PATH="$KERNEL_ROOT/arch/arm64/$DEFCONFIG"
-          export ZZH_PATCHES="$GITHUB_WORKSPACE"
-
-          IFS='|' read -ra MODULES <<< "$CUSTOM_EXTERNAL_MODULES"
-          for module_spec in "${MODULES[@]}"; do
-            IFS=';' read -r module_url stage <<< "$module_spec"
-            module_name=$(basename "$module_url" .git)
-            echo "--- 外部模块: $module_name (阶段: $stage) ---"
-            git clone --depth=1 "$module_url" "../$module_name"
-            if [ -f "../$module_name/setup.sh" ]; then
-              cd "../$module_name"
-              bash setup.sh
-              cd "$GITHUB_WORKSPACE/kernel"
-            else
-              echo "::warning::模块 $module_name 无 setup.sh，跳过"
-            fi
-          done
-
-      # ── 编译内核 ──────────────────────────────────────────────────────────
+          git add -A && git commit -m "Remove -dirty suffix" || true
+          echo "--- 已集成: ReSukiSU/SuSFS v2.1.00/BBR/BBRv2/ipset/BBG/LZ4KD/NTSYNC/Docker ---"
 
       - name: 编译内核
         shell: bash
@@ -460,9 +72,8 @@ jobs:
           export KBUILD_BUILD_USER="abk"
           export KBUILD_BUILD_HOST="abk"
           export KBUILD_BUILD_VERSION=1
-          export KBUILD_BUILD_TIMESTAMP="$BUILD_TIME"
+          export KBUILD_BUILD_TIMESTAMP="$(date -u '+%Y%m%d%H%M%S')"
 
-          # 4.19 内核: Clang + GCC cross，LLVM=1
           make O=out \
             ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -497,77 +108,36 @@ jobs:
           }
           ccache -s
 
-      # ── 打包 AnyKernel3 ──────────────────────────────────────────────────
-
       - name: 打包 AnyKernel3
         shell: bash
         run: |
           set -euo pipefail
+          cd kernel
 
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1
           rm -rf AnyKernel3/.git
 
-          # 查找内核镜像 (Image.gz-dtb > Image.gz > Image)
-          KERNEL_IMAGE=$(find kernel/out/arch/arm64/boot \
+          KERNEL_IMAGE=$(find out/arch/arm64/boot \
             -name "Image.gz-dtb" -o -name "Image.gz" -o -name "Image" | head -n 1)
           if [ -z "$KERNEL_IMAGE" ]; then
             echo "::error::未找到内核镜像"
             exit 1
           fi
           cp "$KERNEL_IMAGE" AnyKernel3/
-          echo "--- 复制内核镜像: $(basename $KERNEL_IMAGE) ---"
 
-          # 生成适配 OnePlus 6 的 anykernel.sh
-          cat > AnyKernel3/anykernel.sh << 'AKSH'
-          ### AnyKernel3 Ramdisk Mod Script
-          ## osm0sis @ xda-developers
-
-          ### AnyKernel setup
-          properties() { '
-          kernel.string=ABK Legacy · ReSukiSU · __DEVICE_DISPLAY__ · __BUILD_DATE__
-          do.devicecheck=0
-          do.modules=0
-          do.systemless=0
-          do.cleanup=1
-          do.cleanuponabort=0
-          supported.versions=
-          supported.patchlevels=
-          '; }
-
-          block=boot;
-          is_slot_device=auto;
-          ramdisk_compression=auto;
-          patch_vbmeta_flag=auto;
-
-          . tools/ak3-core.sh;
-
-          ## AnyKernel boot install
-          dump_boot;
-
-          vbmeta_disable_verification;
-
-          write_boot;
-          ## end boot install
-          AKSH
-
-          # 替换占位符
-          sed -i "s/__DEVICE_DISPLAY__/${DEVICE_DISPLAY}/g" AnyKernel3/anykernel.sh
-          sed -i "s/__BUILD_DATE__/$(date -u '+%Y-%m-%d')/g" AnyKernel3/anykernel.sh
+          echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMuMS4wIEJCUjIrTFo0S0QrTlRTWU5DK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cD0xCmRvLmNsZWFudXBvbmFib3J0PTAKc3VwcG9ydGVkLnZlcnNpb25zPQpzdXBwb3J0ZWQucGF0Y2hsZXZlbHM9Cic7IH0KCmJsb2NrPWJvb3Q7CmlzX3Nsb3RfZGV2aWNlPWF1dG87CnJhbWRpc2tfY29tcHJlc3Npb249YXV0bzsKcGF0Y2hfdmJtZXRhX2ZsYWc9YXV0bzsKCi4gdG9vbHMvYWszLWNvcmUuc2g7CgojIyBBbnlLZXJuZWwgYm9vdCBpbnN0YWxsCmR1bXBfYm9vdDsKCnZibWV0YV9kaXNhYmxlX3ZlcmlmaWNhdGlvbjsKCndyaXRlX2Jvb3Q7CiMjIGVuZCBib290IGluc3RhbGwK" | base64 -d > AnyKernel3/anykernel.sh
 
           cd AnyKernel3
-          ZIP_NAME="ABK_Legacy_${DEVICE_NAME}_ReSukiSU_${VERSION_LABEL}.zip"
+          ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
           zip -r9 "../${ZIP_NAME}" ./*
           cd ..
-          echo "--- AK3 打包完成 ---"
+          echo "--- 打包完成 ---"
           ls -lh "${ZIP_NAME}"
-
-          echo "ARTIFACT_NAME=ABK_Legacy_${DEVICE_NAME}_ReSukiSU_${VERSION_LABEL}" >> "$GITHUB_ENV"
-
-      # ── 上传产物 ──────────────────────────────────────────────────────────
+          echo "ARTIFACT_NAME=${ZIP_NAME%.zip}" >> "$GITHUB_ENV"
 
       - name: 上传 AnyKernel3
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ABK_Legacy_*.zip
+          path: ABK_OnePlus6_*.zip
           if-no-files-found: error
