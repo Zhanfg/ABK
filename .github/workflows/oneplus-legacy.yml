@@ -133,15 +133,16 @@ jobs:
           if [ -n "$DTBO_FILES" ]; then
             echo "找到 DTBO 覆盖层:"
             echo "$DTBO_FILES" | while read f; do ls -lh "$f"; done
-            # Concatenate enchilada DTBO overlays into dtbo.img
-            # OnePlus 6 (enchilada) mp variant is the production version
-            cat $DTBO_FILES > "$DTBO_DIR/dtbo.img"
+            # Use mkdtboimg.py to create proper dtbo.img with header
+            curl -sL "https://raw.githubusercontent.com/K-Blaaaack/mkdtboimg/main/mkdtboimg.py" -o /tmp/mkdtboimg.py
+            chmod +x /tmp/mkdtboimg.py
+            python3 /tmp/mkdtboimg.py create "$DTBO_DIR/dtbo.img" $DTBO_FILES
             echo "✓ dtbo.img 已从源码重建 ($(du -h "$DTBO_DIR/dtbo.img" | cut -f1))"
             cp "$DTBO_DIR/dtbo.img" ./dtbo.img
           else
             echo "::warning::未找到 enchilada DTBO 文件，使用预置 dtbo.img"
             if [ -f "../../dtbo.img" ]; then
-              cp ../../dtbo.img AnyKernel3/
+              cp ../../dtbo.img ./dtbo.img
             fi
           fi
 
@@ -191,14 +192,14 @@ jobs:
           fi
           ls -lh AnyKernel3/dtbo.img
 
-          # Also copy vbmeta-disable-verification tool from original AK3
-          if [ -f "AnyKernel3/dtbo.img" ] || [ -f "../dtbo.img" ]; then
-            # Download from original AnyKernel3 repo (has this tool)
-            curl -sL "https://raw.githubusercontent.com/osm0sis/AnyKernel3/master/tools/vbmeta-disable-verification" -o AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null
-            chmod +x AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || true
-            if [ -s AnyKernel3/tools/vbmeta-disable-verification ]; then
-              echo "✓ vbmeta-disable-verification 已添加"
-            fi
+          # vbmeta-disable-verification (可选工具)
+          curl -sL "https://raw.githubusercontent.com/nickyzhang/platform_system_core/refs/heads/master/mkbootimg/vbmeta-disable-verification" -o AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || true
+          if [ -s AnyKernel3/tools/vbmeta-disable-verification ] && [ $(stat -c%s AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || echo 0) -gt 100 ]; then
+            chmod +x AnyKernel3/tools/vbmeta-disable-verification
+            echo "✓ vbmeta-disable-verification 已添加"
+          else
+            echo "⚠ vbmeta-disable-verification 不可用（可选，不影响刷机）"
+            rm -f AnyKernel3/tools/vbmeta-disable-verification
           fi
 
           echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAoKIyMgZHRib19pbWcgZmxhc2ggKE9uZVBsdXMgNiByZXF1aXJlcyBzZXBhcmF0ZSBkdGJvIHBhcnRpdGlvbikKaWYgWyAtZiAiZHRib19pbWciIF07IHRoZW4KICBibG9jaz0kKGR1bXBfZHRib19wYXJ0aXRpb24pCiAgd3JpdGVfZHRibwpmaQ==" | base64 -d > AnyKernel3/anykernel.sh
