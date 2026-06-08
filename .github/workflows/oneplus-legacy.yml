@@ -129,7 +129,8 @@ jobs:
           # Build dtbo.img from compiled DTBO overlays (OnePlus 6 requires this)
           echo "--- 从源码重建 dtbo.img ---"
           DTBO_DIR=out/arch/arm64/boot/dts/qcom
-          DTBO_FILES=$(find "$DTBO_DIR" -name "enchilada*.dtbo" 2>/dev/null | sort)
+          # Include both enchilada (OnePlus 6) and fajita (OnePlus 6T) overlays
+          DTBO_FILES=$(find "$DTBO_DIR" \( -name "enchilada*.dtbo" -o -name "fajita*.dtbo" \) 2>/dev/null | sort)
           if [ -n "$DTBO_FILES" ]; then
             echo "找到 DTBO 覆盖层:"
             echo "$DTBO_FILES" | while read f; do ls -lh "$f"; done
@@ -140,7 +141,7 @@ jobs:
             echo "✓ dtbo.img 已从源码重建 ($(du -h "$DTBO_DIR/dtbo.img" | cut -f1))"
             cp "$DTBO_DIR/dtbo.img" ./dtbo.img
           else
-            echo "::warning::未找到 enchilada DTBO 文件，使用预置 dtbo.img"
+            echo "::warning::未找到 DTBO 文件，使用预置 dtbo.img"
             if [ -f "../../dtbo.img" ]; then
               cp ../../dtbo.img ./dtbo.img
             fi
