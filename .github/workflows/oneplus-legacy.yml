@@ -213,7 +213,8 @@ jobs:
           # ReSukiSU 已完成 KernelSU 集成，无需额外 KSU 补丁
 
           echo "--- 写入 SuSFS Kconfig ---"
-          cat >> arch/arm64/$DEFCONFIG <<'CONF'
+          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
+          cat >> "$DEFCONFIG_FILE" <<'CONF'
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -242,7 +243,8 @@ jobs:
         run: |
           set -euo pipefail
           cd kernel
-          cat >> arch/arm64/$DEFCONFIG <<'CONF'
+          DEFCONFIG_FILE="arch/arm64/configs/$DEFCONFIG"
+          cat >> "$DEFCONFIG_FILE" <<'CONF'
           CONFIG_ZSMALLOC=y
           CONFIG_ZRAM=y
           CONFIG_MODULE_SIG=n
