@@ -192,16 +192,16 @@ jobs:
           fi
           ls -lh AnyKernel3/dtbo.img
 
-          # vbmeta-disable-verification (libxzr release)
+          # vbmeta-disable-verification (libxzr release - arm64 for OnePlus 6)
           curl -sL "https://github.com/libxzr/vbmeta-disable-verification/releases/download/v1.0/vbmeta-disable-verification.zip" -o /tmp/vbmeta.zip 2>/dev/null
           if [ -s /tmp/vbmeta.zip ]; then
-            cd /tmp && unzip -o vbmeta.zip > /dev/null 2>&1
-            if [ -f /tmp/vbmeta-disable-verification ]; then
-              cp /tmp/vbmeta-disable-verification AnyKernel3/tools/
+            unzip -j /tmp/vbmeta.zip "arm64-v8a/vbmeta-disable-verification" -d AnyKernel3/tools/ 2>/dev/null
+            if [ -f AnyKernel3/tools/vbmeta-disable-verification ]; then
               chmod +x AnyKernel3/tools/vbmeta-disable-verification
               echo "✓ vbmeta-disable-verification 已添加 ($(du -h AnyKernel3/tools/vbmeta-disable-verification | cut -f1))"
+            else
+              echo "⚠ vbmeta-disable-verification 提取失败（zip 内容结构异常）"
             fi
-            cd - > /dev/null
           else
             echo "⚠ vbmeta-disable-verification 下载失败（可选，不影响刷机）"
           fi
