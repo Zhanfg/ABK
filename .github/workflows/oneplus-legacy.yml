@@ -192,14 +192,18 @@ jobs:
           fi
           ls -lh AnyKernel3/dtbo.img
 
-          # vbmeta-disable-verification (可选工具)
-          curl -sL "https://raw.githubusercontent.com/nickyzhang/platform_system_core/refs/heads/master/mkbootimg/vbmeta-disable-verification" -o AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || true
-          if [ -s AnyKernel3/tools/vbmeta-disable-verification ] && [ $(stat -c%s AnyKernel3/tools/vbmeta-disable-verification 2>/dev/null || echo 0) -gt 100 ]; then
-            chmod +x AnyKernel3/tools/vbmeta-disable-verification
-            echo "✓ vbmeta-disable-verification 已添加"
+          # vbmeta-disable-verification (libxzr release)
+          curl -sL "https://github.com/libxzr/vbmeta-disable-verification/releases/download/v1.0/vbmeta-disable-verification.zip" -o /tmp/vbmeta.zip 2>/dev/null
+          if [ -s /tmp/vbmeta.zip ]; then
+            cd /tmp && unzip -o vbmeta.zip > /dev/null 2>&1
+            if [ -f /tmp/vbmeta-disable-verification ]; then
+              cp /tmp/vbmeta-disable-verification AnyKernel3/tools/
+              chmod +x AnyKernel3/tools/vbmeta-disable-verification
+              echo "✓ vbmeta-disable-verification 已添加 ($(du -h AnyKernel3/tools/vbmeta-disable-verification | cut -f1))"
+            fi
+            cd - > /dev/null
           else
-            echo "⚠ vbmeta-disable-verification 不可用（可选，不影响刷机）"
-            rm -f AnyKernel3/tools/vbmeta-disable-verification
+            echo "⚠ vbmeta-disable-verification 下载失败（可选，不影响刷机）"
           fi
 
           echo "IyMjIEFueUtlcm5lbDMgUmFtZGlzayBNb2QgU2NyaXB0CiMjIG9zbTBzaXMgQCB4ZGEtZGV2ZWxvcGVycwoKIyMjIEFueUtlcm5lbCBzZXR1cApwcm9wZXJ0aWVzKCkgeyAnCmtlcm5lbC5zdHJpbmc9QUJLIE9uZVBsdXM2IFJlU3VraVNVK1N1U0ZTMi4xLjAwK0JCUitMWjRLRCtOVFNZTkMrQkJHK0RvY2tlcgpkby5kZXZpY2VjaGVjaz0wCmRvLm1vZHVsZXM9MApkby5zeXN0ZW1sZXNzPTAKZG8uY2xlYW51cHM9MQpkby5jbGVhbnVwYWJvcnQ9MApzdXBwb3J0ZWQudmVyc2lvbnM9CnN1cHBvcnRlZC5wYXRjaGxldmVscz0KJzsgfQoKYmxvY2s9Ym9vdDsKaXNfc2xvdF9kZXZpY2U9YXV0bzsKcmFtZGlza19jb21wcmVzc2lvbj1hdXRvOwpwYXRjaF92Ym1ldGFfZmxhZz1hdXRvOwoKLiB0b29scy9hazMtY29yZS5zaDsKCiMjIEFueUtlcm5lbCBib290IGluc3RhbGwKZHVtcF9ib290OwoKd3JpdGVfYm9vdDsKIyMgZW5kIGJvb3QgaW5zdGFsbAoKIyMgZHRib19pbWcgZmxhc2ggKE9uZVBsdXMgNiByZXF1aXJlcyBzZXBhcmF0ZSBkdGJvIHBhcnRpdGlvbikKaWYgWyAtZiAiZHRib19pbWciIF07IHRoZW4KICBibG9jaz0kKGR1bXBfZHRib19wYXJ0aXRpb24pCiAgd3JpdGVfZHRibwpmaQ==" | base64 -d > AnyKernel3/anykernel.sh
