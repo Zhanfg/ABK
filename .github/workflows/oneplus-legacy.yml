@@ -126,17 +126,10 @@ jobs:
           ls -lh out/arch/arm64/boot/Image.gz-dtb
           echo "--- 压缩完成 ---"
 
+          DTBO_DIR=out/arch/arm64/boot/dts/qcom
           # Build ALL DTBO overlays (OnePlus 6/6T require this)
           echo "--- 强制编译所有 DTBO 覆盖层 ---"
-          make -j"$(nproc --all)" O=out \
-            ARCH=arm64 \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CC="ccache clang" \
-            LD=ld.lld \
-            DTC_FLAGS="-@" \
-            dtbs
-          # Force compile specific dtbo overlays if not built
+          # Force compile specific dtbo overlays
           for dtbo in enchilada-evb-v2.1-overlay enchilada-t0-v2.1-overlay \
                       enchilada-evt1-v2.1-overlay enchilada-evt2-v2.1-overlay \
                       enchilada-evt2-cxo-v2.1-overlay enchilada-dvt-v2.1-overlay \
@@ -146,7 +139,7 @@ jobs:
             if [ ! -f "$DTBO_DIR/${dtbo}.dtbo" ]; then
               make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
                 CLANG_TRIPLE=aarch64-linux-gnu- \
-                DTC_FLAGS="-@" "$DTBO_DIR/${dtbo}.dtbo" 2>/dev/null || true
+                "$DTBO_DIR/${dtbo}.dtbo" 2>/dev/null || true
             fi
           done
           echo "--- 实际 DTBO 列表 ---"
