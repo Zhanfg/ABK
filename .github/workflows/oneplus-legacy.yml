@@ -175,13 +175,15 @@ jobs:
 
           cd AnyKernel3
           ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
-          # Build list of files to include, explicitly handle dtbo.img
-          FILES_TO_ADD="./*"
+          # Explicit file list to avoid .gitignore interference with wildcards
+          zip -r9 "../${ZIP_NAME}" Image.gz-dtb anykernel.sh LICENSE README.md META-INF/ tools/ modules/ patch/ ramdisk/
           if [ -f "dtbo.img" ]; then
-            FILES_TO_ADD="./dtbo.img $FILES_TO_ADD"
-            echo "Including dtbo.img"
+            zip -j "../${ZIP_NAME}" dtbo.img
+            echo "✓ dtbo.img 已加入 ZIP ($(du -h dtbo.img | cut -f1))"
+          else
+            echo "⚠ dtbo.img 缺失!"
+            ls -la dtbo.img 2>&1 || true
           fi
-          zip -r9 "../${ZIP_NAME}" $FILES_TO_ADD
 
           # Sign the zip (required by stock OxygenOS recovery)
           cd ..
