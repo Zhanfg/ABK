@@ -137,23 +137,26 @@ jobs:
           find "$DTBO_DIR" -name "enchilada*.dtbo" -o -name "fajita*.dtbo" | sort
 
           # Build dtbo.img from compiled DTBO overlays (OnePlus 6 requires this)
-          echo "--- 从源码重建 dtbo.img ---"
+          # Priority: 1) ABK root dtbo.img (pre-built 8.4MB) 2) rebuilt from source
+          echo "--- 准备 dtbo.img ---"
           DTBO_DIR=out/arch/arm64/boot/dts/qcom
-          # Include both enchilada (OnePlus 6) and fajita (OnePlus 6T) overlays
-          DTBO_FILES=$(find "$DTBO_DIR" \( -name "enchilada*.dtbo" -o -name "fajita*.dtbo" \) 2>/dev/null | sort)
-          if [ -n "$DTBO_FILES" ]; then
-            echo "找到 DTBO 覆盖层:"
-            echo "$DTBO_FILES" | while read f; do ls -lh "$f"; done
-            # Use mkdtboimg.py to create proper dtbo.img with header
-            curl -sL "https://raw.githubusercontent.com/K-Blaaaack/mkdtboimg/main/mkdtboimg.py" -o /tmp/mkdtboimg.py
-            chmod +x /tmp/mkdtboimg.py
-            python3 /tmp/mkdtboimg.py create "$DTBO_DIR/dtbo.img" $DTBO_FILES
-            echo "✓ dtbo.img 已从源码重建 ($(du -h "$DTBO_DIR/dtbo.img" | cut -f1))"
-            cp "$DTBO_DIR/dtbo.img" ./dtbo.img
+          if [ -f "../../dtbo.img" ]; then
+            echo "✓ 使用 ABK 根目录的完整 dtbo.img (8.4MB, 16 overlays)"
+            cp ../../dtbo.img ./dtbo.img
           else
-            echo "::warning::未找到 DTBO 文件，使用预置 dtbo.img"
-            if [ -f "../../dtbo.img" ]; then
-              cp ../../dtbo.img ./dtbo.img
+            echo "--- 从源码重建 dtbo.img ---"
+            DTBO_FILES=$(find "$DTBO_DIR" \( -name "enchilada*.dtbo" -o -name "fajita*.dtbo" -o -name "sdm845*overlay.dtbo" \) 2>/dev/null | sort)
+            if [ -n "$DTBO_FILES" ]; then
+              echo "找到 DTBO 覆盖层:"
+              echo "$DTBO_FILES" | while read f; do ls -lh "$f"; done
+              curl -sL "https://raw.githubusercontent.com/K-Blaaaack/mkdtboimg/main/mkdtboimg.py" -o /tmp/mkdtboimg.py
+              chmod +x /tmp/mkdtboimg.py
+              python3 /tmp/mkdtboimg.py create "$DTBO_DIR/dtbo.img" $DTBO_FILES
+              echo "✓ dtbo.img 已从源码重建 ($(du -h "$DTBO_DIR/dtbo.img" | cut -f1))"
+              cp "$DTBO_DIR/dtbo.img" ./dtbo.img
+            else
+              echo "::error::未找到任何 DTBO 文件！"
+              exit 1
             fi
           fi
 
