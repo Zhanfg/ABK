@@ -175,7 +175,13 @@ jobs:
 
           cd AnyKernel3
           ZIP_NAME="ABK_OnePlus6_Enchilada_ReSukiSU_SuSFS210_$(date -u '+%Y%m%d-%H%M').zip"
-          zip -r9 "../${ZIP_NAME}" ./*
+          # Build list of files to include, explicitly handle dtbo.img
+          FILES_TO_ADD="./*"
+          if [ -f "dtbo.img" ]; then
+            FILES_TO_ADD="./dtbo.img $FILES_TO_ADD"
+            echo "Including dtbo.img"
+          fi
+          zip -r9 "../${ZIP_NAME}" $FILES_TO_ADD
 
           # Sign the zip (required by stock OxygenOS recovery)
           cd ..
