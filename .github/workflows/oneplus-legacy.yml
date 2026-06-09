@@ -173,6 +173,9 @@ jobs:
 
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1
           rm -rf AnyKernel3/.git
+          # Remove OnePlus 6T specific tools we don't need
+          rm -f AnyKernel3/tools/snapshotupdater_static
+          echo "✓ 已移除 OnePlus 6T 专用工具 (snapshotupdater_static, 省 1.6MB)"
 
           # Find kernel image - prefer compressed format (Image.gz-dtb)
           KERNEL_IMAGE=$(find out/arch/arm64/boot -name "Image.gz-dtb" | head -n 1)
