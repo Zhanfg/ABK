@@ -583,7 +583,8 @@ data class AbkRuntimeStatus(
     val manager: AbkRuntimeManagerInfo? = null,
     @SerializedName("runtime_backend") val runtimeBackend: AbkRuntimeManagerInfo? = null,
     val build: AbkRuntimeBuildInfo? = null,
-    val modules: List<AbkRuntimeModule> = emptyList()
+    val modules: List<AbkRuntimeModule> = emptyList(),
+    @SerializedName("extension_modules") val extensionModules: List<AbkRuntimeModule> = emptyList()
 )
 
 data class AbkRuntimeManagerInfo(
@@ -621,7 +622,13 @@ data class AbkRuntimeModule(
     val description: String = "",
     @SerializedName("repo_url") val repoUrl: String = "",
     val stage: String = "",
+    @SerializedName("entry_kind") val entryKind: String = "",
     val source: String = "",
+    @SerializedName("extension_id") val extensionId: String = "",
+    @SerializedName("companion_package") val companionPackage: String = "",
+    @SerializedName("companion_display_name") val companionDisplayName: String = "",
+    @SerializedName("companion_asset_name") val companionAssetName: String = "",
+    @SerializedName("companion_download_url") val companionDownloadUrl: String = "",
     @SerializedName("module_dir") val moduleDir: String = "",
     @SerializedName("web_root") val webRoot: String = "",
     val readonly: Boolean = false,
@@ -632,6 +639,10 @@ data class AbkRuntimeModule(
     @SerializedName("has_web_ui") val hasWebUi: Boolean = false,
     @SerializedName("has_action_script") val hasActionScript: Boolean = false,
     @SerializedName("action_supported") val actionSupported: Boolean = false,
+    @SerializedName("requires_companion_app") val requiresCompanionApp: Boolean = false,
+    @SerializedName("settings_supported") val settingsSupported: Boolean = false,
+    @SerializedName("per_app_supported") val perAppSupported: Boolean = false,
+    @SerializedName("oobe_priority") val oobePriority: Int = 0,
     @SerializedName("kpm_args") val kpmArgs: String = "",
     @SerializedName("group_id") val groupId: String = "",
     @SerializedName("group_name") val groupName: String = "",
