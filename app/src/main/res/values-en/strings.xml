@@ -60,6 +60,10 @@
     <string name="root_local_capability_desc">Root is used only when flashing, installing modules, or checking root-related capabilities. Kernel version detection does not require root.</string>
     <string name="root_after_auth_flow">After authorization, GitHub sign-in and fork checks start automatically.</string>
 
+    <!-- Local preferences recovery -->
+    <string name="preferences_reset_title">Local data was reset</string>
+    <string name="preferences_reset_message">ABK detected corrupted local preferences and reset them automatically. Your saved login state, build configuration, and other local settings may need to be configured again.</string>
+
     <!-- Auth -->
     <string name="login_title">Sign in to GitHub</string>
     <string name="login_desc">ABK needs GitHub authorization to manage the fork repository and trigger kernel build workflows.</string>
@@ -205,10 +209,11 @@
     <string name="build_kernel_option_clear_all_action">Clear all</string>
     <string name="build_enable_oneplus_8e">Enable OnePlus 8E support</string>
     <string name="build_oneplus_lz4kd">Enable lz4kd</string>
+    <string name="build_oneplus_lz4kd_unsupported">Kernel 6.12 uses the new ZRAM backend and does not support the legacy lz4kd patch.</string>
     <string name="build_oneplus_bbr">Enable BBR</string>
     <string name="build_oneplus_proxy_optimization">Enable proxy optimization</string>
     <string name="build_oneplus_proxy_mtk_disabled">Proxy optimization is forced off for MTK branches.</string>
-    <string name="build_oneplus_susfs_unsupported">The current OnePlus KMI has no available SUSFS upstream branch. Only android14/6.1 and android15/6.6 are supported; android12/5.10 and android13/5.15 are disabled automatically.</string>
+    <string name="build_oneplus_susfs_unsupported">The current OnePlus KMI has no available SUSFS upstream branch. android12/5.10 and android13/5.15 are disabled automatically.</string>
     <string name="build_oneplus_unicode_bypass">Enable Unicode zero-width bypass fix</string>
     <string name="build_oneplus_proxy_short">Proxy optimization</string>
     <string name="build_oneplus_unicode_short">Unicode bypass</string>
@@ -625,6 +630,7 @@
     <string name="settings_logout_desc">Sign out</string>
     <string name="settings_fork_repo">Fork repository</string>
     <string name="settings_not_logged_in">Not signed in</string>
+    <string name="settings_login_hint">Tap to sign in with GitHub</string>
     <string name="settings_auto_download_desc">Applies only to the next newly submitted build. Turning it off will not auto-download.</string>
     <string name="settings_prebuilt_gki">Prebuilt GKI fetch and download</string>
     <string name="settings_prebuilt_gki_desc">Fetch prebuilt GKI from this repository release. Downloads are manual.</string>

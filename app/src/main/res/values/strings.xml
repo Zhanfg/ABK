@@ -60,6 +60,10 @@
     <string name="root_local_capability_desc">只在需要刷写、安装模块和检测 Root 相关能力时调用 Root。内核版本识别不依赖 Root。</string>
     <string name="root_after_auth_flow">授权后会自动进入 GitHub 登录和 fork 检查流程。</string>
 
+    <!-- Local preferences recovery -->
+    <string name="preferences_reset_title">本地数据已重置</string>
+    <string name="preferences_reset_message">检测到 ABK 本地配置数据库损坏，已自动重置。已保存的登录状态、构建配置和其他本地设置可能需要重新配置。</string>
+
     <!-- Auth -->
     <string name="login_title">登录 GitHub</string>
     <string name="login_desc">ABK 需要您的 GitHub 授权以管理 fork 仓库并触发内核构建工作流。</string>
@@ -230,10 +234,11 @@
     <string name="build_kernel_option_clear_all_action">清理全部</string>
     <string name="build_enable_oneplus_8e">启用一加 8E 支持</string>
     <string name="build_oneplus_lz4kd">启用 lz4kd</string>
+    <string name="build_oneplus_lz4kd_unsupported">6.12 使用新式 ZRAM backend，不支持 legacy lz4kd 补丁。</string>
     <string name="build_oneplus_bbr">启用 BBR</string>
     <string name="build_oneplus_proxy_optimization">启用代理优化</string>
     <string name="build_oneplus_proxy_mtk_disabled">MTK 分支已强制关闭代理优化。</string>
-    <string name="build_oneplus_susfs_unsupported">当前 OnePlus KMI 没有可用的 SUSFS 上游分支；仅 android14/6.1 与 android15/6.6 支持，android12/5.10 和 android13/5.15 会自动关闭。</string>
+    <string name="build_oneplus_susfs_unsupported">当前 OnePlus KMI 没有可用的 SUSFS 上游分支；android12/5.10 和 android13/5.15 会自动关闭。</string>
     <string name="build_oneplus_unicode_bypass">启用 Unicode 零宽绕过修复</string>
     <string name="build_oneplus_proxy_short">代理优化</string>
     <string name="build_oneplus_unicode_short">Unicode 绕过</string>
@@ -654,6 +659,7 @@
     <string name="settings_logout_desc">退出登录</string>
     <string name="settings_fork_repo">Fork 仓库</string>
     <string name="settings_not_logged_in">未登录</string>
+    <string name="settings_login_hint">点击前往登录 GitHub 账户</string>
     <string name="settings_auto_download_desc">仅对下一次新提交的构建生效，关闭后不会自动下载</string>
     <string name="settings_prebuilt_gki">预编译 GKI 获取与下载</string>
     <string name="settings_prebuilt_gki_desc">从本仓库 Release 获取预编译 GKI，下载需手动触发</string>
